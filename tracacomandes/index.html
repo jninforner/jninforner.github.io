@@ -110,13 +110,16 @@ img,video,canvas{max-width:100%;height:auto}
   #line .grid,#catalog-line .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   #line .grid>label:first-of-type,#catalog-line .grid>label:first-of-type{grid-column:1/-1}
 }
+
+.order-lines{background:#eaf5ee;border-color:#a8cbb5}
+:root[data-theme=dark] .order-lines{background:#19332e;border-color:#4e7866}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.5.1<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.5.2<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -442,7 +445,7 @@ function notify(message, error = false) {
   status.classList.toggle('error',error);
 }
 
-async function save(payload, done, button, success = () => 'Canvis desats.') {
+async function save(payload, done, button, success = () => 'Canvis desats.', afterRender) {
   if (busy) return;
   busy = true;
   setSync('Desant…');
@@ -456,6 +459,7 @@ async function save(payload, done, button, success = () => 'Canvis desats.') {
     setSync('Sincronitzat');
     notify(success(result));
     render();
+    afterRender?.();
   } catch (error) {
     setSync('Revisa l’últim canvi');
     if (error.status === 409 && ['draft','order'].includes(payload.action)) {
@@ -668,7 +672,7 @@ function order() {
     '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" value="1" required></label>'+
     '<label>Unitat<select id="line-unit" name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label>'+
     '</div><p id="order-supplier-status" class="meta"></p><button id="add-line">Afegeix la línia</button></form>'+
-    '</article><article class="card"><h2>Línies de la comanda</h2>'+
+    '</article><article class="card order-lines"><h2>Línies de la comanda</h2>'+
     (draft.map((line,index) => '<div class="row item"><div><strong>'+escape(byId('articles',line.article)?.name)+'</strong>'+
       '<div class="meta">'+escape(byId('suppliers',line.supplier)?.name)+'</div></div>'+
       '<form class="draft-quantity-form" data-edit-quantity="'+index+'">'+
@@ -697,7 +701,8 @@ function orderOptions() {
   supplierOptions();
 }
 
-function pickOrderArticle(id) {
+async function pickOrderArticle(id) {
+  if (busy) return;
   const article = byId('articles',id);
   if (!article) return;
   orderArticle = id;
@@ -705,8 +710,21 @@ function pickOrderArticle(id) {
   showMatches = false;
   document.querySelector('#order-search').value = orderSearch;
   orderOptions();
-  const supplier = document.querySelector('#supplier');
-  (supplier.disabled ? document.querySelector('#order-search') : supplier).focus();
+  await addSelectedArticle();
+}
+
+async function addSelectedArticle() {
+  const form = document.querySelector('#line');
+  const {supplier, unit, quantity} = form.elements;
+  if (!supplier.value) {
+    (supplier.disabled ? document.querySelector('#order-search') : supplier).focus();
+    return;
+  }
+  if (!unit.value) {
+    unit.focus();
+    return;
+  }
+  await addDraftLine(form,{article:orderArticle,supplier:supplier.value,unit:unit.value,quantity:quantity.valueAsNumber});
 }
 
 function supplierOptions() {
@@ -714,6 +732,7 @@ function supplierOptions() {
   const offers = data.offers.filter(offer => offer.article_id === orderArticle);
   select.innerHTML = options(offers.map(offer => byId('suppliers',offer.supplier_id)).filter(Boolean),
     offers.length === 1 ? offers[0].supplier_id : '', 'Tria un proveïdor');
+  select.form.hidden = !orderArticle;
   select.disabled = !offers.length;
   document.querySelector('#add-line').disabled = !offers.length;
   document.querySelector('#order-supplier-status').textContent = orderArticle && !offers.length ? 'Aquest article encara no té cap proveïdor assignat.' : '';
@@ -887,7 +906,7 @@ document.addEventListener('click',async event => {
   } else if (target.removeStaff) {
     await save({action:'staffRemove',email:target.removeStaff},null,button);
   } else if (target.pickArticle) {
-    pickOrderArticle(target.pickArticle);
+    await pickOrderArticle(target.pickArticle);
   } else if (button.id === 'quick-toggle' || button.id === 'cancel-quick') {
     creatingArticle = !creatingArticle;
     render();
@@ -962,6 +981,7 @@ document.addEventListener('change', async event => {
     if (field.required) field.focus();
   }
   if (event.target.id === 'supplier') defaultUnit();
+  if (event.target.matches('#supplier, #line-unit')) await addSelectedArticle();
   if (event.target.id === 'category-filter' || event.target.id === 'supplier-filter') {
     if (event.target.id === 'category-filter') categoryFilter = event.target.value;
     else supplierFilter = event.target.value;
@@ -1049,27 +1069,41 @@ document.addEventListener('submit',async event => {
       creatingArticle = false;
     },event.submitter,()=>'Article creat. Ja el pots afegir a la comanda.');
   } else if (form.id === 'line' || form.id === 'catalog-line') {
-    const draft = data.draft.lines;
-    const offer = data.offers.find(item => item.article_id === values.article && item.supplier_id === values.supplier);
-    const quantity = Number(values.quantity);
-    if (!offer || !values.unit || !Number.isFinite(quantity) || quantity <= 0) {
-      notify('Tria un article, un proveïdor i una unitat, i indica una quantitat positiva.',true);
-      return;
-    }
-    const lines = combineDraftLines([...draft,{...values,quantity}]);
-    if (lines.length > 100 || lines.some(line => !Number.isFinite(line.quantity))) {
-      notify('Revisa el total de la quantitat. La comanda admet fins a 100 línies.',true);
-      return;
-    }
-    if (form.id === 'catalog-line') {
-      await save({action:'draft',lines,revision:data.draft.revision},() => {
-        addingArticle = '';
-      },event.submitter,()=>'Article afegit a la comanda.');
-    } else {
-      await saveDraft(lines,event.submitter);
-    }
+    await addDraftLine(form,values,event.submitter);
   }
 });
+
+async function addDraftLine(form, values, button) {
+  const {article,supplier,unit} = values;
+  const quantity = Number(values.quantity);
+  const offer = data.offers.find(item => item.article_id === article && item.supplier_id === supplier);
+  if (!offer || !unit || !Number.isFinite(quantity) || quantity <= 0) {
+    notify('Tria un article, un proveïdor i una unitat, i indica una quantitat positiva.',true);
+    return;
+  }
+  const matches = line => line.article === article && line.supplier === supplier && line.unit === unit;
+  const lines = combineDraftLines([...data.draft.lines,{article,supplier,unit,quantity}]);
+  if (lines.length > 100 || lines.some(line => !Number.isFinite(line.quantity))) {
+    notify('Revisa el total de la quantitat. La comanda admet fins a 100 línies.',true);
+    return;
+  }
+  const fromCatalog = form.id === 'catalog-line';
+  await save({action:'draft',lines,revision:data.draft.revision},() => {
+    if (fromCatalog) {
+      addingArticle = '';
+    } else {
+      orderArticle = '';
+      orderSearch = '';
+      showMatches = false;
+    }
+  },button,()=>'Article afegit a la comanda.',() => {
+    if (fromCatalog) return;
+    const index = data.draft.lines.findIndex(matches);
+    const field = content.querySelector('[data-edit-quantity="'+index+'"] input');
+    field?.focus();
+    field?.select();
+  });
+}
 
 if (!initialData) setSync('Carregant…');
 (initialData ? Promise.resolve(initialData) : api()).then(result => {
