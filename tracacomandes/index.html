@@ -47,12 +47,40 @@ button:disabled{opacity:.55;cursor:not-allowed}
 #order-match-status:empty{display:none}
 #line{margin-top:12px}
 [hidden]{display:none !important}
+.topbar{position:relative;gap:12px;padding-bottom:10px;border:0}
+.brand{min-width:0}
+.brand h1{font-size:clamp(20px,4.5vw,30px);line-height:1.1;overflow-wrap:anywhere}
+.version{margin-top:5px}
+.top-actions{display:flex;flex-shrink:0;gap:8px;align-items:center}
+.top-actions button{gap:7px;min-height:42px;padding:8px 12px;white-space:nowrap}
+.top-actions button span{font-size:18px;line-height:1}
+.menu-anchor{position:relative}
+#menu-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:5;width:192px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 30px rgba(40,55,126,.15);padding:10px}
+#tabs{display:grid;gap:6px;margin:0 0 6px}
+#menu-panel button{width:100%;justify-content:flex-start}
+@media(max-width:430px){
+  .topbar,.top-actions{gap:6px}
+  .top-actions button{font-size:14px;padding:7px 9px}
+  .version{font-size:13px}
+}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
-<header><div><h1>TraçaComandes</h1><span class="meta">Versió 1.2.0</span></div><div class="actions"><button id="logout" hidden>Surt</button><button id="theme" aria-label="Canvia el tema">◐</button></div></header>
+<header class="topbar">
+  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.2.1<span id="sync-state" role="status"></span></div></div>
+  <div class="top-actions">
+    <div class="menu-anchor">
+      <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
+      <div id="menu-panel" hidden>
+        <nav aria-label="Seccions" id="tabs"></nav>
+        <button id="theme" type="button" aria-pressed="false">Mode fosc</button>
+      </div>
+    </div>
+    <button id="logout" type="button" hidden><span aria-hidden="true">↪</span> Sortir</button>
+  </div>
+</header>
 <section id="login-panel" class="card">
 <h2>Inicia sessió</h2>
 <p id="login-status" role="status">Carregant l’accés…</p>
@@ -84,7 +112,6 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <button type="submit">Verifica el correu</button>
 </form></section>
 <div id="workspace" hidden>
-<nav aria-label="Seccions" id="tabs"></nav>
 <p id="status" role="status"></p>
 <section id="content" aria-label="Contingut"></section>
 </div>
@@ -97,6 +124,28 @@ const content = document.querySelector('#content');
 const status = document.querySelector('#status');
 const tabs = document.querySelector('#tabs');
 const theme = document.querySelector('#theme');
+const menuButton = document.querySelector('#menu-toggle');
+const menuPanel = document.querySelector('#menu-panel');
+const syncState = document.querySelector('#sync-state');
+
+function setMenu(open) {
+  menuPanel.hidden = !open;
+  menuButton.setAttribute('aria-expanded',String(open));
+}
+
+function setSync(label) {
+  syncState.textContent = ' · '+label;
+}
+
+menuButton.onclick = () => setMenu(menuPanel.hidden);
+document.addEventListener('click',event => {
+  if (!menuPanel.hidden && !event.target.closest('.menu-anchor')) setMenu(false);
+});
+document.addEventListener('keydown',event => {
+  if (event.key !== 'Escape' || menuPanel.hidden) return;
+  setMenu(false);
+  menuButton.focus();
+});
 const dateFormat = new Intl.DateTimeFormat('ca-ES',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Madrid'});
 const quantityFormat = new Intl.NumberFormat('ca-ES',{maximumSignificantDigits:15});
 let data;
@@ -148,6 +197,7 @@ function notify(message, error = false) {
 async function save(payload, done, button, success = () => 'Canvis desats.') {
   if (busy) return;
   busy = true;
+  setSync('Desant…');
   if (button) button.disabled = true;
   let saved = false;
   try {
@@ -155,9 +205,11 @@ async function save(payload, done, button, success = () => 'Canvis desats.') {
     saved = true;
     done?.(result);
     data = await api();
+    setSync('Sincronitzat');
     notify(success(result));
     render();
   } catch (error) {
+    setSync('Revisa l’últim canvi');
     if (error.status === 409 && ['draft','order'].includes(payload.action)) {
       try {
         data = await api();
@@ -327,14 +379,16 @@ function messageCard(lines) {
 }
 
 function staff() {
-  return '<article class="card"><h2>Accés de l’equip</h2><form id="staff-access"><div class="grid">'+
-    '<label>Correu del treballador<input type="email" name="email" autocomplete="off" required></label></div>'+
+  return '<article class="card"><h2>Accés de l’equip</h2>'+
+    '<p class="meta">Ets l’administrador de TraçaComandes. Pots autoritzar usuaris i retirar-los l’accés.</p>'+
+    '<form id="staff-access"><div class="grid"><label>Correu del treballador<input type="email" name="email" autocomplete="off" required></label></div>'+
     '<button class="primary">Autoritza</button></form>'+
     (data.staff.map(person => '<div class="row item"><span>'+escape(person.email)+'</span><button data-remove-staff="'+escape(person.email)+'">Retira l’accés</button></div>').join('') ||
       empty('Encara no hi ha treballadors autoritzats.'))+'</article>';
 }
 
 function render() {
+  menuButton.hidden = false;
   const tabsToShow = data.staff ? {...sections,staff:'Equip'} : sections;
   tabs.innerHTML = Object.entries(tabsToShow).map(([key,label]) => '<button data-tab="'+key+'" '+(section === key ? 'aria-current="page"' : '')+'>'+label+'</button>').join('');
   content.innerHTML = section === 'order' ? order() : section === 'history' ? history() : section === 'staff' ? staff() : catalog();
@@ -346,6 +400,10 @@ document.addEventListener('click',async event => {
   if (!button || button.id === 'theme' || !data || busy) return;
   const target = button.dataset;
   if (target.tab) {
+    if (tabs.contains(button)) {
+      setMenu(false);
+      menuButton.focus();
+    }
     section = target.tab;
     edit = '';
     notify('');
@@ -477,12 +535,16 @@ document.addEventListener('submit',async event => {
   }
 });
 
-if (!initialData) notify('Carregant les dades…');
+if (!initialData) setSync('Carregant…');
 (initialData ? Promise.resolve(initialData) : api()).then(result => {
   data = result;
+  setSync('Sincronitzat');
   notify('');
   render();
-}).catch(error => notify('No s’han pogut carregar les dades. '+error.message,true));
+}).catch(error => {
+  setSync('Sense connexió');
+  notify('No s’han pogut carregar les dades. '+error.message,true);
+});
 
 }
 
