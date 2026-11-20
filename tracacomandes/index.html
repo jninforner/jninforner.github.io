@@ -52,7 +52,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </head>
 <body>
 <main>
-<header><div><h1>TraçaComandes</h1><span class="meta">Versió 1.1.3</span></div><div class="actions"><button id="logout" hidden>Surt</button><button id="theme" aria-label="Canvia el tema">◐</button></div></header>
+<header><div><h1>TraçaComandes</h1><span class="meta">Versió 1.2.0</span></div><div class="actions"><button id="logout" hidden>Surt</button><button id="theme" aria-label="Canvia el tema">◐</button></div></header>
 <section id="login-panel" class="card">
 <h2>Inicia sessió</h2>
 <p id="login-status" role="status">Carregant l’accés…</p>
@@ -187,13 +187,17 @@ function catalog() {
     '<label>Nom<input name="name" required maxlength="120" value="'+escape(current?.name)+'"></label>'+
     (isSupplier ? '<label>WhatsApp amb prefix internacional<input name="phone" type="tel" placeholder="+34 600 000 000" value="'+(current?.phone ? '+'+escape(current.phone) : '')+'"></label>' : '')+
     (isArticle ? '<label>Categoria<select name="category">'+options(data.categories,current?.category_id,'Sense categoria')+'</select></label><label>Unitat de compra<select name="unit">'+options(data.units.filter(unit => unit.id !== pendingUnit),current?.unit_id,'Sense unitat')+'</select></label>' : '')+
-    '</div><div class="actions"><button class="primary">Desa</button>'+(current ? '<button type="button" data-cancel>Cancel·la</button>' : '')+'</div></form></article>'+
+    (isSupplier ? '<label>Nom del comercial<input name="contact" maxlength="120" value="'+escape(current?.contact)+'"></label>' : '')+
+    '</div>'+
+    (isSupplier ? '<label>Missatge de WhatsApp<textarea name="messageTemplate" maxlength="1000" rows="4" placeholder="Bon dia, {comercial}! Us voldríem fer aquesta comanda:">'+escape(current?.message_template)+'</textarea></label>'+
+      '<p class="meta">Pots fer servir <code>{comercial}</code>, <code>{proveidor}</code> i <code>{articles}</code>. Si deixes el missatge buit, s’utilitzarà el text per defecte.</p>' : '')+
+    '<div class="actions"><button class="primary">Desa</button>'+(current ? '<button type="button" data-cancel>Cancel·la</button>' : '')+'</div></form></article>'+
     (section === 'articles' && current ? offerEditor(current) : '')+
     (isArticle ? '<article class="card"><details><summary>Importa el catàleg</summary><form id="import-catalog"><p class="meta">Fitxer JSON amb els articles, les categories, les unitats i els proveïdors.</p><label>Fitxer de catàleg<input name="catalog" type="file" accept=".json,application/json"></label><label>O enganxa el contingut JSON<textarea name="catalogText" rows="3"></textarea></label><button class="primary">Importa els articles</button></form></details></article>' : '')+
     '<article class="card"><h2>'+sections[section]+'</h2>'+filters+'<div id="catalog-rows">'+
     (rows.map(item => {
       const linked = data.offers.filter(offer => offer.article_id === item.id);
-      const detail = isSupplier ? (item.phone ? '+'+item.phone : 'WhatsApp pendent') : section === 'articles' ? ([byId('categories',item.category_id)?.name,byId('units',item.unit_id)?.name,linked.map(offer => byId('suppliers',offer.supplier_id)?.name).filter(Boolean).join(' · ') || 'Sense proveïdors'].filter(Boolean).join(' · ')) : '';
+      const detail = isSupplier ? [item.contact,item.phone ? '+'+item.phone : 'Tria el contacte a WhatsApp'].filter(Boolean).join(' · ') : section === 'articles' ? ([byId('categories',item.category_id)?.name,byId('units',item.unit_id)?.name,linked.map(offer => byId('suppliers',offer.supplier_id)?.name).filter(Boolean).join(' · ') || 'Sense proveïdors'].filter(Boolean).join(' · ')) : '';
       return '<div class="item row"><div><strong>'+escape(item.name)+'</strong>'+(detail ? '<div class="meta">'+escape(detail)+'</div>' : '')+'</div><button data-edit="'+escape(item.id)+'">Edita</button></div>';
     }).join('') || empty('Cap '+label+' per mostrar.'))+'</div></article>';
 }
@@ -294,16 +298,31 @@ function history() {
       const groups = Map.groupBy(lines,line => line.supplier_id);
       return '<div class="item"><div class="row"><div><strong>'+escape(dateFormat.format(new Date(lines[0].created_at)))+'</strong><div class="meta">'+
         lines.length+' '+(lines.length === 1 ? 'línia' : 'línies')+' · '+groups.size+' '+(groups.size === 1 ? 'proveïdor' : 'proveïdors')+
-        '</div></div><button data-order="'+escape(id)+'" aria-expanded="'+(id === openOrder)+'">'+(id === openOrder ? 'Amaga' : 'Mostra els missatges')+'</button></div>'+
+        '</div><div class="meta">'+(lines[0].author_email ? 'Desada per '+escape(lines[0].author_email) : 'Autor sense registrar')+'</div></div><button data-order="'+escape(id)+'" aria-expanded="'+(id === openOrder)+'">'+(id === openOrder ? 'Amaga' : 'Mostra els missatges')+'</button></div>'+
         (id === openOrder ? [...groups.values()].map(messageCard).join('') : '')+'</div>';
     }).join('') || empty('Encara no hi ha comandes desades.'))+'</article>';
 }
 
+function supplierMessage(lines, current) {
+  const supplier = lines[0];
+  const articles = lines.map(line => '• '+quantityFormat.format(line.quantity)+' '+line.unit+' de '+line.article).join('\n');
+  const contact = supplier.contact ?? current?.contact;
+  const template = supplier.message_template ?? current?.message_template;
+  const hello = contact ? 'Bon dia, '+contact+'!' : 'Bon dia!';
+  if (!template) return hello+' Us voldríem fer aquesta comanda:\n\n'+articles+'\n\nGràcies!';
+  const values = {comercial:contact || supplier.supplier,proveidor:supplier.supplier,articles};
+  const text = template.replace(/\{(comercial|proveidor|articles)\}/g,(_, key) => values[key]);
+  return template.includes('{articles}') ? text : text+'\n\n'+articles;
+}
+
 function messageCard(lines) {
   const supplier = lines[0];
-  const message = 'Bon dia! Us voldríem fer aquesta comanda:\n\n'+lines.map(line => '• '+quantityFormat.format(line.quantity)+' '+line.unit+' de '+line.article).join('\n')+'\n\nGràcies!';
+  const current = byId('suppliers',supplier.supplier_id);
+  const phone = current?.phone || supplier.phone;
+  const message = supplierMessage(lines,current);
+  const link = 'https://wa.me/'+(phone || '')+'?text='+encodeURIComponent(message);
   return '<section class="item"><h3>'+escape(supplier.supplier)+'</h3><label>Missatge<textarea readonly rows="'+Math.min(13,lines.length+4)+'">'+escape(message)+'</textarea></label><div class="actions">'+
-    (supplier.phone ? '<a class="button whatsapp" target="_blank" rel="noopener noreferrer" href="https://wa.me/'+escape(supplier.phone)+'?text='+escape(encodeURIComponent(message))+'">Obre WhatsApp</a>' : '<span class="meta">WhatsApp pendent</span>')+
+    '<a class="button whatsapp" href="'+escape(link)+'">'+(phone ? 'Obre WhatsApp' : 'Tria el contacte a WhatsApp')+'</a>'+
     '<button data-copy>Copia el missatge</button></div></section>';
 }
 
