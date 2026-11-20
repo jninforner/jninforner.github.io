@@ -63,13 +63,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
   .top-actions button{font-size:14px;padding:7px 9px}
   .version{font-size:13px}
 }
+.catalog-line{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--soft)}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.2.1<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.3.0<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -152,6 +153,8 @@ let data;
 let section = 'order';
 let edit = '';
 let categoryFilter = '';
+let supplierFilter = '';
+let addingArticle = '';
 let articleSearch = '';
 let openOrder = '';
 let orderArticle = '';
@@ -228,13 +231,12 @@ async function save(payload, done, button, success = () => 'Canvis desats.') {
 function catalog() {
   const current = byId(section,edit);
   const isSupplier = section === 'suppliers';
-  const names = {suppliers:'proveïdor',articles:'article',units:'unitat',categories:'categoria'};
-  const label = names[section];
   const title = current ? 'Edita ' + current.name : {suppliers:'Nou proveïdor',articles:'Nou article',units:'Nova unitat',categories:'Nova categoria'}[section];
   const isArticle = section === 'articles';
-  const rows = data[section].filter(item => item.id !== pendingUnit && (!isArticle || ((!categoryFilter || (item.category_id || '-') === categoryFilter) &&
-    item.name.toLocaleLowerCase('ca').includes(articleSearch.toLocaleLowerCase('ca')))));
-  const filters = isArticle ? '<div id="article-filters" class="grid"><label>Cerca per nom<input id="article-search" type="search" value="'+escape(articleSearch)+'"></label><label>Categoria<select id="category-filter">'+options(data.categories,categoryFilter,'Totes les categories')+'<option value="-" '+(categoryFilter === '-' ? 'selected' : '')+'>Sense categoria</option></select></label></div>' : '';
+  const filters = isArticle ? '<div id="article-filters" class="grid">'+
+    '<label>Cerca per nom<input id="article-search" type="search" value="'+escape(articleSearch)+'"></label>'+
+    '<label>Proveïdor<select id="supplier-filter">'+options(data.suppliers,supplierFilter,'Tots els proveïdors')+'</select></label>'+
+    '<label>Categoria<select id="category-filter">'+options(data.categories,categoryFilter,'Totes les categories')+'<option value="-" '+(categoryFilter === '-' ? 'selected' : '')+'>Sense categoria</option></select></label></div>' : '';
   return '<article class="card"><h2>'+escape(title)+'</h2><form id="catalog"><div class="grid">'+
     '<label>Nom<input name="name" required maxlength="120" value="'+escape(current?.name)+'"></label>'+
     (isSupplier ? '<label>WhatsApp amb prefix internacional<input name="phone" type="tel" placeholder="+34 600 000 000" value="'+(current?.phone ? '+'+escape(current.phone) : '')+'"></label>' : '')+
@@ -247,11 +249,45 @@ function catalog() {
     (section === 'articles' && current ? offerEditor(current) : '')+
     (isArticle ? '<article class="card"><details><summary>Importa el catàleg</summary><form id="import-catalog"><p class="meta">Fitxer JSON amb els articles, les categories, les unitats i els proveïdors.</p><label>Fitxer de catàleg<input name="catalog" type="file" accept=".json,application/json"></label><label>O enganxa el contingut JSON<textarea name="catalogText" rows="3"></textarea></label><button class="primary">Importa els articles</button></form></details></article>' : '')+
     '<article class="card"><h2>'+sections[section]+'</h2>'+filters+'<div id="catalog-rows">'+
-    (rows.map(item => {
-      const linked = data.offers.filter(offer => offer.article_id === item.id);
-      const detail = isSupplier ? [item.contact,item.phone ? '+'+item.phone : 'Tria el contacte a WhatsApp'].filter(Boolean).join(' · ') : section === 'articles' ? ([byId('categories',item.category_id)?.name,byId('units',item.unit_id)?.name,linked.map(offer => byId('suppliers',offer.supplier_id)?.name).filter(Boolean).join(' · ') || 'Sense proveïdors'].filter(Boolean).join(' · ')) : '';
-      return '<div class="item row"><div><strong>'+escape(item.name)+'</strong>'+(detail ? '<div class="meta">'+escape(detail)+'</div>' : '')+'</div><button data-edit="'+escape(item.id)+'">Edita</button></div>';
-    }).join('') || empty('Cap '+label+' per mostrar.'))+'</div></article>';
+    catalogRows()+'</div></article>';
+}
+
+function catalogRows() {
+  const isArticle = section === 'articles';
+  const isSupplier = section === 'suppliers';
+  const query = searchKey(articleSearch);
+  const names = {suppliers:'proveïdor',articles:'article',units:'unitat',categories:'categoria'};
+  return data[section].filter(item => item.id !== pendingUnit).map(item => {
+    const linked = isArticle ? data.offers.filter(offer => offer.article_id === item.id) : [];
+    if (isArticle && ((categoryFilter && (item.category_id || '-') !== categoryFilter) ||
+        (supplierFilter && !linked.some(offer => offer.supplier_id === supplierFilter)) || !searchKey(item.name).includes(query))) return '';
+    const detail = isSupplier ? [item.contact,item.phone ? '+'+item.phone : 'Tria el contacte a WhatsApp'].filter(Boolean).join(' · ') :
+      isArticle ? [byId('categories',item.category_id)?.name,byId('units',item.unit_id)?.name,
+        linked.map(offer => byId('suppliers',offer.supplier_id)?.name).filter(Boolean).join(' · ') || 'Sense proveïdors'].filter(Boolean).join(' · ') : '';
+    const browse = isSupplier || section === 'categories'
+      ? '<button data-browse-articles="'+escape(item.id)+'">Mostra els articles</button>' : '';
+    const order = isArticle ? '<button data-add-article="'+escape(item.id)+'" aria-expanded="'+(addingArticle === item.id)+'"'+
+      (linked.length ? '' : ' disabled')+'>Afegeix a la comanda</button>' : '';
+    return '<div class="item"><div class="row"><div><strong>'+escape(item.name)+'</strong>'+
+      (detail ? '<div class="meta">'+escape(detail)+'</div>' : '')+'</div><div class="actions">'+order+browse+
+      '<button data-edit="'+escape(item.id)+'">Edita</button></div></div>'+
+      (isArticle && addingArticle === item.id ? catalogLine(item,linked) : '')+'</div>';
+  }).join('') || empty('Cap '+names[section]+' per mostrar.');
+}
+
+function catalogLine(article, offers) {
+  const supplier = offers.find(offer => offer.supplier_id === supplierFilter) || (offers.length === 1 ? offers[0] : null);
+  const suppliers = offers.map(offer => byId('suppliers',offer.supplier_id)).filter(Boolean);
+  return '<form id="catalog-line" class="catalog-line" aria-label="Afegeix '+escape(article.name)+' a la comanda">'+
+    '<input type="hidden" name="article" value="'+escape(article.id)+'"><div class="grid">'+
+    '<label>Proveïdor<select name="supplier" required>'+options(suppliers,supplier?.supplier_id,'Tria un proveïdor')+'</select></label>'+
+    '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" required></label>'+
+    '<label>Unitat<select name="unit" required>'+options(purchaseUnits(),offerUnit(article,supplier),'Tria una unitat')+'</select></label></div>'+
+    '<div class="actions"><button class="primary">Afegeix la línia</button><button type="button" data-close-line>Cancel·la</button></div></form>';
+}
+
+function offerUnit(article, offer) {
+  return offer && offer.unit_id !== pendingUnit ? offer.unit_id : article?.unit_id || '';
 }
 
 function offerEditor(article) {
@@ -336,7 +372,7 @@ function supplierOptions() {
 function defaultUnit() {
   const supplier = document.querySelector('#supplier').value;
   const offer = data.offers.find(item => item.article_id === orderArticle && item.supplier_id === supplier);
-  document.querySelector('#line-unit').value = offer && offer.unit_id !== pendingUnit ? offer.unit_id : byId('articles',orderArticle)?.unit_id || '';
+  document.querySelector('#line-unit').value = offerUnit(byId('articles',orderArticle),offer);
 }
 
 function saveDraft(lines, button) {
@@ -405,9 +441,29 @@ document.addEventListener('click',async event => {
       menuButton.focus();
     }
     section = target.tab;
+    addingArticle = '';
     edit = '';
     notify('');
     render();
+  } else if (target.browseArticles) {
+    supplierFilter = section === 'suppliers' ? target.browseArticles : '';
+    categoryFilter = section === 'categories' ? target.browseArticles : '';
+    articleSearch = '';
+    addingArticle = '';
+    edit = '';
+    section = 'articles';
+    notify('');
+    render();
+    const search = document.querySelector('#article-search');
+    search.scrollIntoView({block:'nearest'});
+    search.focus();
+  } else if (target.addArticle || Object.hasOwn(target,'closeLine')) {
+    const article = target.addArticle || addingArticle;
+    addingArticle = addingArticle === article ? '' : article;
+    refreshCatalogRows();
+    const line = document.querySelector('#catalog-line');
+    if (line) (line.elements.supplier.value ? line.elements.quantity : line.elements.supplier).focus();
+    else [...content.querySelectorAll('[data-add-article]')].find(item => item.dataset.addArticle === article)?.focus();
   } else if (target.edit || Object.hasOwn(target,'cancel')) {
     edit = target.edit || '';
     render();
@@ -459,9 +515,17 @@ document.addEventListener('change', async event => {
     return;
   }
   if (event.target.id === 'supplier') defaultUnit();
-  if (event.target.id === 'category-filter') {
-    categoryFilter = event.target.value;
+  if (event.target.id === 'category-filter' || event.target.id === 'supplier-filter') {
+    if (event.target.id === 'category-filter') categoryFilter = event.target.value;
+    else supplierFilter = event.target.value;
+    addingArticle = '';
     refreshCatalogRows();
+  }
+  if (event.target.matches('#catalog-line select[name=supplier]')) {
+    const form = event.target.form;
+    const article = byId('articles',form.elements.article.value);
+    const offer = data.offers.find(item => item.article_id === article.id && item.supplier_id === event.target.value);
+    form.elements.unit.value = offerUnit(article,offer);
   }
   if (event.target.matches('#offer select[name=supplier]')) {
     const offer = data.offers.find(item => item.article_id === edit && item.supplier_id === event.target.value);
@@ -470,9 +534,7 @@ document.addEventListener('change', async event => {
 });
 
 function refreshCatalogRows() {
-  const template = document.createElement('template');
-  template.innerHTML = catalog();
-  document.querySelector('#catalog-rows').replaceChildren(...template.content.querySelector('#catalog-rows').childNodes);
+  document.querySelector('#catalog-rows').innerHTML = catalogRows();
 }
 
 document.addEventListener('input', event => {
@@ -484,6 +546,7 @@ document.addEventListener('input', event => {
   }
   if (event.target.id !== 'article-search') return;
   articleSearch = event.target.value;
+  addingArticle = '';
   refreshCatalogRows();
 });
 
@@ -523,7 +586,7 @@ document.addEventListener('submit',async event => {
       showMatches = false;
       creatingArticle = false;
     },event.submitter,()=>'Article creat. Ja el pots afegir a la comanda.');
-  } else if (form.id === 'line') {
+  } else if (form.id === 'line' || form.id === 'catalog-line') {
     const draft = data.draft.lines;
     const offer = data.offers.find(item => item.article_id === values.article && item.supplier_id === values.supplier);
     const quantity = Number(values.quantity);
@@ -531,7 +594,13 @@ document.addEventListener('submit',async event => {
       notify('Tria un article, un proveïdor i una unitat, i indica una quantitat positiva. La comanda admet fins a 100 línies.',true);
       return;
     }
-    await saveDraft([...draft,{...values,quantity}],event.submitter);
+    if (form.id === 'catalog-line') {
+      await save({action:'draft',lines:[...draft,{...values,quantity}],revision:data.draft.revision},() => {
+        addingArticle = '';
+      },event.submitter,()=>'Article afegit a la comanda.');
+    } else {
+      await saveDraft([...draft,{...values,quantity}],event.submitter);
+    }
   }
 });
 
