@@ -1,0 +1,1379 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>NexaComandes</title>
+<link rel="icon" type="image/png" href="./icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./icon.png">
+<style>:root{color-scheme:light;--bg:#f7f8fd;--tx:#28377e;--mu:#566598;--ln:#303f91;--surface:#fff;--soft:#f0f2fc;--border:#d4daf1;--field:#b6bfdf;--on:#fff;--red:#b42318;--green:#17734a}
+:root[data-theme=dark]{color-scheme:dark;--bg:#10152c;--tx:#e5e9ff;--mu:#adb8e5;--ln:#a1afff;--surface:#1b2447;--soft:#232f59;--border:#425080;--field:#6371a0;--on:#10152c;--red:#ff9992;--green:#84dbab}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:760px;margin:auto;padding:20px 16px 36px}
+header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:18px}
+h1{font-size:28px;letter-spacing:-.035em;margin:0}
+h2{font-size:21px;margin:0 0 14px}
+h3{font-size:17px;margin:0 0 8px}
+p{margin:8px 0}
+nav,.actions{display:flex;gap:8px;flex-wrap:wrap}
+nav{margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:0 3px 14px rgba(40,55,126,.055);padding:20px;margin-bottom:16px}
+label{display:grid;gap:4px;font-size:14px;color:var(--mu)}
+input,select,textarea{width:100%;min-height:46px;padding:8px 12px;border:1px solid var(--field);border-radius:10px;background:var(--surface);color:var(--tx);font:inherit;font-size:16px}
+textarea{display:block;resize:vertical;margin:10px 0}
+button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 15px;border:1px solid var(--ln);border-radius:10px;background:var(--surface);color:var(--tx);font:600 15px/1.3 inherit;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none}
+button:hover,.button:hover{background:var(--soft)}
+.primary,[aria-current=page]{background:var(--ln);color:var(--on)}
+.primary:hover,[aria-current=page]:hover{background:var(--ln);filter:brightness(1.13)}
+:focus-visible{outline:3px solid #788cf0;outline-offset:2px}
+button:disabled{opacity:.55;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.item{border-top:1px solid var(--border);padding:12px 0}
+.item:last-child{padding-bottom:0}
+.meta{color:var(--mu);font-size:14px}
+.error,.remove{color:var(--red)}
+#status:empty{display:none}
+#status{margin-bottom:12px}
+.whatsapp{color:var(--green);border-color:var(--green)}
+@media(max-width:430px){main{padding:14px 12px 28px}.card{padding:15px}h1{font-size:24px}nav button{padding:8px 11px}}
+.order-lookup{margin-bottom:12px}
+.order-matches{margin-top:6px;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:10px}
+.order-matches button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;border:0;border-radius:0;text-align:left}
+.order-matches button+button{border-top:1px solid var(--border)}
+.order-matches button:focus-visible{outline-offset:-3px}
+#order-match-status:empty{display:none}
+#line{margin-top:12px}
+[hidden]{display:none !important}
+.topbar{position:relative;gap:12px;padding-bottom:10px;border:0}
+.brand{min-width:0}
+.brand h1{font-size:clamp(20px,4.5vw,30px);line-height:1.1;overflow-wrap:anywhere}
+.version{margin-top:5px}
+.top-actions{display:flex;flex-shrink:0;gap:8px;align-items:center}
+.top-actions button{gap:7px;min-height:42px;padding:8px 12px;white-space:nowrap}
+.top-actions button span{font-size:18px;line-height:1}
+.menu-anchor{position:relative}
+#menu-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:5;width:192px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 30px rgba(40,55,126,.15);padding:10px}
+#tabs{display:grid;gap:6px;margin:0 0 6px}
+#menu-panel button{width:100%;justify-content:flex-start}
+@media(max-width:430px){
+  .topbar,.top-actions{gap:6px}
+  .top-actions button{font-size:14px;padding:7px 9px}
+  .version{font-size:13px}
+}
+.catalog-line{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--soft)}
+:root{--draft-highlight:#edf8f1}
+:root[data-theme=dark]{--draft-highlight:#19332e}
+.item.in-draft,.order-matches button.in-draft{background:var(--draft-highlight)}
+.item.in-draft{padding-inline:10px;border-radius:8px}
+.draft-badge{display:inline-block;margin-inline-start:8px;color:var(--green);font-size:13px;font-weight:650}
+.order-matches .draft-badge{margin-inline-start:0}
+#read-catalog button,#confirm-pdf>.actions{margin-top:10px}
+.pdf-rows{max-height:55vh;overflow:auto;margin-top:12px}
+.pdf-row{display:grid;grid-template-columns:5rem minmax(9rem,2fr) repeat(2,minmax(5rem,1fr));gap:8px;padding:10px 0;border-top:1px solid var(--border)}
+.pdf-select{display:flex;align-items:center;align-self:center;white-space:nowrap}
+.pdf-select input{width:18px;min-height:18px}
+@media(max-width:550px){
+  .pdf-row{grid-template-columns:1fr 1fr}
+  .pdf-row label:nth-child(2){grid-column:1/-1;grid-row:2}
+}
+main{width:100%;padding-inline:max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-right))}
+.card,.grid,.grid>* ,label,.row>*{min-width:0}
+input,select,textarea,button,.button{max-width:100%;min-width:0}
+input[type=file]{width:100%}
+img,video,canvas{max-width:100%;height:auto}
+.card{overflow-wrap:anywhere}
+.grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
+#login-panel{max-width:500px;margin-inline:auto}
+#login-form .grid{grid-template-columns:minmax(0,1fr)}
+.login-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#password-reset{display:inline-block;margin:12px 0;color:var(--tx);text-underline-offset:.18em}
+#login-status:empty{display:none}
+.contact-actions{margin:8px 0 12px}
+.contact-file{position:relative;cursor:pointer}
+.contact-file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.contact-file:focus-within{outline:3px solid #788cf0;outline-offset:2px}
+.recipient-picker{margin-top:10px}
+.recipient-picker form{margin-top:12px}
+.remember-contact{display:flex;align-items:center;gap:8px;margin:12px 0}
+.remember-contact input{width:18px;min-height:18px;flex:none}
+@media(max-width:480px){
+  html{-webkit-text-size-adjust:100%}
+  .topbar{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+  .top-actions{flex-wrap:wrap}
+  #menu-panel{left:0;right:auto;max-width:calc(100vw - 32px)}
+  button,.button{touch-action:manipulation}
+  #line .grid,#catalog-line .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #line .grid>label:first-of-type,#catalog-line .grid>label:first-of-type{grid-column:1/-1}
+}
+
+.order-lines{background:#eaf0ff;border-color:#afbfeb}
+:root[data-theme=dark] .order-lines{background:#202e55;border-color:#516798}
+
+.draft-line{display:grid;grid-template-columns:minmax(0,1fr) auto 44px;gap:8px;align-items:start}
+.draft-description{min-width:0;width:min(100%,17rem)}
+.draft-name summary{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650;cursor:pointer}
+.draft-name summary::-webkit-details-marker{display:none}
+.draft-name div{padding:4px 0;overflow-wrap:anywhere}
+.draft-remove{grid-column:3;grid-row:1;justify-self:end;width:44px;border:0;background:transparent;padding:0;font-size:27px}
+.draft-quantity-form{grid-column:2;grid-row:1;display:grid;grid-template-columns:minmax(0,5rem) minmax(0,7rem) auto;gap:6px;align-items:end}
+.draft-quantity-form input,.draft-quantity-form select{height:44px;min-height:44px;padding-inline:8px}
+.draft-quantity-form button{padding-inline:10px}
+@media(max-width:560px){
+  .draft-line{grid-template-columns:minmax(0,1fr) 44px}
+  .draft-remove{grid-column:2}
+  .draft-quantity-form{grid-column:1/-1;grid-row:2;justify-self:start;max-width:100%}
+}
+</style>
+<link rel="manifest" href="./manifest.webmanifest">
+</head>
+<body>
+<main>
+<header class="topbar">
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.5.5<span id="sync-state" role="status"></span></div></div>
+  <div class="top-actions">
+    <div class="menu-anchor">
+      <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
+      <div id="menu-panel" hidden>
+        <nav aria-label="Seccions" id="tabs"></nav>
+        <button id="theme" type="button" aria-pressed="false">Mode fosc</button>
+      </div>
+    </div>
+    <button id="logout" type="button" hidden><span aria-hidden="true">↪</span> Sortir</button>
+  </div>
+</header>
+<section id="login-panel" class="card">
+<h2>Inicia sessió</h2>
+<p id="login-status" role="status">Carregant l’accés…</p>
+<form id="login-form">
+<div class="grid">
+<label>Correu<input name="email" type="email" autocomplete="username" autocapitalize="none" required></label>
+<label>Contrasenya<input name="password" type="password" autocomplete="current-password" required></label>
+</div>
+<div class="login-actions">
+<button class="primary" value="login">Entra</button>
+<button class="primary" value="register">Crea un compte</button>
+</div>
+<a id="password-reset" href="#reset-panel">He oblidat la contrasenya</a></form>
+<details id="reset-panel" class="item" hidden>
+<summary>Restableix amb un enllaç del correu</summary>
+<form id="reset-link-form">
+<div class="grid">
+<label>Enllaç del correu de restabliment<input name="link" type="url" autocomplete="off" autocapitalize="none" required></label>
+<label>Contrasenya nova<input name="password" type="password" minlength="6" autocomplete="new-password" required></label>
+</div>
+<button class="primary">Desa la contrasenya nova</button>
+</form></details>
+<div class="actions" id="verify-actions" hidden>
+<button id="retry-login">Comprova l’accés</button>
+<button id="resend-verification">Torna a enviar el correu</button>
+</div>
+<form id="verify-link-form" class="item" hidden>
+<label>L’enllaç del correu dona error? Enganxa’l aquí<input name="link" type="url" autocomplete="off" autocapitalize="none" required></label>
+<button type="submit">Verifica el correu</button>
+</form></section>
+<div id="workspace" hidden>
+<p id="status" role="status"></p>
+<section id="content" aria-label="Contingut"></section>
+</div>
+</main>
+<script type="module">
+const pdfLibrary = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/legacy/build/';
+const ocrLibrary = 'https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.esm.min.js';
+const pdfKey = value => String(value || '').normalize('NFD').replace(/\p{Diacritic}/gu,'')
+  .toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+const unitsInPdf = {
+  caixa:'caixes', caixes:'caixes', caja:'caixes', cajas:'caixes', kg:'kg', kgs:'kg',
+  unitat:'unitats', unitats:'unitats', ut:'unitats', uts:'unitats', ud:'unitats', uds:'unitats',
+  pieza:'peces', peces:'peces', bossa:'bosses', bosses:'bosses', bolsa:'bosses', bolsas:'bosses',
+  safata:'safates', safates:'safates', bandeja:'safates', pot:'pots', pots:'pots',
+  ampolla:'ampolles', ampolles:'ampolles', botella:'ampolles', botellas:'ampolles',
+  paquet:'paquets', paquets:'paquets', sac:'sacs', sacs:'sacs', llauna:'llaunes',
+  llaunes:'llaunes', litre:'litres', litres:'litres', litro:'litres', litros:'litres',
+  manat:'manats', manats:'manats', pack:'packs', packs:'packs'
+};
+const descriptionHeader = /^(?:(?:descripcio|descripcion|description)(?: del (?:article|producto)| producte)?|article|articulo|producte|producto|producto descripcion|denominacion|nom|nombre|concepto)$/;
+const otherHeader = /^(?:codigo|codi|referencia|ref|sku|ean|precio|preu|pvp|importe|total|iva|cantidad|quantitat|unidad|unitat|uds|uts|formato|format|presentacion|envase)(?: .*)?$/;
+
+function pdfTextRows(items) {
+  const lines = [];
+  const positioned = items.filter(item => item.str?.trim() && item.transform).map(item => ({
+    text:item.str.trim(), x:item.transform[4], y:item.transform[5], end:item.transform[4]+item.width,
+    size:Math.hypot(item.transform[2],item.transform[3])
+  })).sort((a,b) => b.y-a.y || a.x-b.x);
+  for (const item of positioned) {
+    const line = lines.at(-1);
+    if (line && Math.abs(line[0].y-item.y) <= 2.5) line.push(item);
+    else lines.push([item]);
+  }
+  return lines.map(line => {
+    const columns = [];
+    for (const item of line.sort((a,b) => a.x-b.x)) {
+      const last = columns.at(-1);
+      if (last && item.x-last.end <= 12) {
+        last.text += ' '+item.text;
+        last.end = Math.max(last.end,item.end);
+      } else columns.push({...item});
+    }
+    return columns;
+  });
+}
+
+function pdfSupplier(filename, head, suppliers) {
+  const basename = pdfKey(filename.replace(/\.pdf$/i,''));
+  const exact = suppliers.find(supplier => pdfKey(supplier.name) === basename);
+  if (exact) return exact.id;
+  const found = suppliers.filter(supplier => {
+    const name = pdfKey(supplier.name);
+    return name.length >= 4 && ((' '+basename+' ').includes(' '+name+' ') ||
+      head.some(line => (' '+pdfKey(line)+' ').includes(' '+name+' ')));
+  });
+  return found.length === 1 ? found[0].id : '';
+}
+
+function catalogFromPdf(pages, filename, state) {
+  const top = pages[0]?.slice(0,8).map(row => row.map(cell => cell.text).join(' ')) || [];
+  const supplier = pdfSupplier(filename,top,state.suppliers);
+  const anyList = pdfKey(top[0]) === 'falta';
+  const bodySize = (pages[0]?.[0]?.[0]?.size || 0)*0.75;
+  const supplierNames = new Set(state.suppliers.map(item => pdfKey(item.name)));
+  const categories = new Map(state.categories.map(item => [pdfKey(item.name),item.name]));
+  const articleNames = new Map();
+  for (const item of state.articles) {
+    const key = pdfKey(item.name);
+    articleNames.set(key,articleNames.has(key) ? null : item);
+  }
+  const unique = new Map();
+  let category = '';
+  for (const [pageIndex,rows] of pages.entries()) {
+    let header;
+    for (const [index,row] of rows.entries()) {
+      if (!row.length) continue;
+      const joined = row.map(cell => cell.text).join(' ');
+      const key = pdfKey(joined);
+      const heading = categories.get(key);
+      if (row.length === 1 && heading) { category = heading; continue; }
+      if (key === 'uncategorized items') { category = ''; continue; }
+      if (anyList && row[0].size && bodySize) {
+        if (row[0].size < bodySize*0.92) continue;
+        if (row.length === 1 && row[0].size > bodySize*1.08 && row[0].size < bodySize*1.25) {
+          category = joined;
+          continue;
+        }
+      }
+      const description = row.findIndex(cell => descriptionHeader.test(pdfKey(cell.text)));
+      if (description >= 0) {
+        header = {start:row[description].x,end:row[description+1]?.x ?? Infinity};
+        continue;
+      }
+      if (supplierNames.has(key) || /^(?:falta|catalogo|cataleg|tarifa|lista de precios|listado de articulos|llistat d articles|precios|pagina|page|pag |fecha|data |telefons? |telefonos? |fax |correo |email |www |https? |cif |nif |subtotal|total|iva |ref |notas? |observaciones|condiciones)(?:\b|$)/.test(key)) continue;
+      const fields = header ? row.filter(cell => cell.x >= header.start-12 && cell.x < header.end-6) : row;
+      let name = (header ? fields.map(cell => cell.text).join(' ') :
+        fields.find(cell => /\p{L}{3}/u.test(cell.text) && !otherHeader.test(pdfKey(cell.text)))?.text || '').trim();
+      if (!name || !/\p{L}{2}/u.test(name) || name.includes('@') || /^(?:€|EUR\b)/i.test(name)) continue;
+      let unit = '';
+      const parenthesis = name.match(/\s*\((?:\d+(?:[.,]\d+)?\s*[×x]\s*)?([\p{L}]+)\s*\)\s*$/u);
+      if (parenthesis && unitsInPdf[pdfKey(parenthesis[1])]) {
+        unit = unitsInPdf[pdfKey(parenthesis[1])];
+        name = name.slice(0,parenthesis.index).trim();
+      }
+      if (!unit) {
+        const unitField = row.find(cell => unitsInPdf[pdfKey(cell.text)]);
+        if (unitField) unit = unitsInPdf[pdfKey(unitField.text)];
+      }
+      const existing = articleNames.get(pdfKey(name));
+      const existingCategory = state.categories.find(item => item.id === existing?.category_id)?.name || '';
+      if (existing && (!category || category === existingCategory)) name = existing.name;
+      if (!name || name.length > 120) continue;
+      const candidateCategory = category || existingCategory;
+      const id = pdfKey(name)+'|'+pdfKey(candidateCategory);
+      const previous = unique.get(id);
+      const candidate = {name,category:candidateCategory,unit,page:pageIndex+1,include:Boolean(anyList || header || unit || existing || category || index >= 3)};
+      if (!previous || (!previous.unit && unit)) unique.set(id,candidate);
+    }
+  }
+  return {supplier, rows:[...unique.values()]};
+}
+
+async function readCatalogPdf(file, state, progress) {
+  if (file.size > 20*1024*1024) throw new Error('El PDF supera els 20 MB. Divideix-lo en fitxers més petits.');
+  const pdfjs = await import(pdfLibrary+'pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = pdfLibrary+'pdf.worker.min.mjs';
+  const task = pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false});
+  let ocr;
+  let scanned = false;
+  try {
+    const doc = await task.promise;
+    if (doc.numPages > 50) throw new Error('El PDF té més de 50 pàgines. Divideix-lo en fitxers més petits.');
+    const pages = [];
+    for (let number=1;number<=doc.numPages;number++) {
+      progress('Llegint la pàgina '+number+' de '+doc.numPages+'…');
+      const page = await doc.getPage(number);
+      const {items} = await page.getTextContent();
+      let rows = pdfTextRows(items);
+      if (items.map(item => item.str || '').join('').trim().length < 12) {
+        scanned = true;
+        progress('Reconeixent el text de la pàgina '+number+' de '+doc.numPages+'…');
+        if (!ocr) {
+          const library = await import(ocrLibrary);
+          ocr = await (library.createWorker || library.default.createWorker)(['cat','spa','eng']);
+        }
+        const canvas = document.createElement('canvas');
+        const natural = page.getViewport({scale:1});
+        const viewport = page.getViewport({scale:Math.min(2,Math.sqrt(3_000_000/(natural.width*natural.height)))});
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        try {
+          await page.render({canvas,canvasContext:canvas.getContext('2d'),viewport}).promise;
+          const {data} = await ocr.recognize(canvas);
+          rows = data.text.split('\n').filter(line => line.trim()).map(line =>
+            line.trim().split(/\s{2,}/).map((text,x) => ({text,x:x*100})));
+        } finally {
+          canvas.width = canvas.height = 0;
+        }
+      }
+      pages.push(rows);
+      page.cleanup();
+    }
+    return {...catalogFromPdf(pages,file.name,state),scanned};
+  } finally {
+    await Promise.allSettled([task.destroy(),ocr?.terminate()]);
+  }
+}
+
+function whatsappPhone(value) {
+  const text = String(value || '').trim();
+  if (!/^\+?[\d\s().-]+$/.test(text)) return '';
+  const digits = text.replace(/\D/g,'');
+  if (digits.startsWith('00')) return whatsappPhone('+'+digits.slice(2));
+  if (!text.startsWith('+') && /^[6789]\d{8}$/.test(digits)) return '34'+digits;
+  return /^[1-9]\d{7,14}$/.test(digits) ? digits : '';
+}
+
+function vCardContact(text) {
+  const entries = text.replace(/\r?\n[ \t]/g,'').split(/\r?\n/);
+  if (entries.filter(line => /^BEGIN:VCARD$/i.test(line.trim())).length !== 1) return null;
+  const name = entries.find(line => /^(?:[\w-]+\.)?FN(?:;[^:]*)?:/i.test(line));
+  return {
+    name:name?.slice(name.indexOf(':')+1).replace(/\\[nN]/g,' ').replace(/\\([,;\\])/g,'$1').trim() || '',
+    tel:entries.filter(line => /^(?:[\w-]+\.)?TEL(?:;[^:]*)?:/i.test(line)).map(line =>
+      line.slice(line.indexOf(':')+1).replace(/^tel:/i,'').trim())
+  };
+}
+
+function combineDraftLines(lines) {
+  const combined = new Map();
+  for (const line of lines) {
+    const key = JSON.stringify([line.article,line.supplier,line.unit]);
+    const previous = combined.get(key);
+    if (previous) {
+      previous.quantity = Number((previous.quantity + line.quantity).toPrecision(15));
+    } else {
+      combined.set(key,{...line});
+    }
+  }
+  return [...combined.values()];
+}
+
+function mountApp(request, initialData) {
+const pendingUnit = 'pending-supplier-unit';
+const sections = {order:'Nova comanda', articles:'Articles', suppliers:'Proveïdors', categories:'Categories', units:'Unitats', history:'Historial'};
+const content = document.querySelector('#content');
+const status = document.querySelector('#status');
+const tabs = document.querySelector('#tabs');
+const theme = document.querySelector('#theme');
+const menuButton = document.querySelector('#menu-toggle');
+const menuPanel = document.querySelector('#menu-panel');
+const syncState = document.querySelector('#sync-state');
+
+function setMenu(open) {
+  menuPanel.hidden = !open;
+  menuButton.setAttribute('aria-expanded',String(open));
+}
+
+function setSync(label) {
+  syncState.textContent = ' · '+label;
+}
+
+menuButton.onclick = () => setMenu(menuPanel.hidden);
+document.addEventListener('click',event => {
+  if (!menuPanel.hidden && !event.target.closest('.menu-anchor')) setMenu(false);
+});
+document.addEventListener('keydown',event => {
+  if (event.key !== 'Escape' || menuPanel.hidden) return;
+  setMenu(false);
+  menuButton.focus();
+});
+const dateFormat = new Intl.DateTimeFormat('ca-ES',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Madrid'});
+const quantityFormat = new Intl.NumberFormat('ca-ES',{maximumSignificantDigits:15});
+let data;
+let section = 'order';
+let edit = '';
+let categoryFilter = '';
+let supplierFilter = '';
+let addingArticle = '';
+let pdfReview;
+let readingPdf = false;
+let articleSearch = '';
+let openOrder = '';
+let orderArticle = '';
+let orderSearch = '';
+let showMatches = true;
+let creatingArticle = false;
+const purchaseUnits = () => data.units.filter(unit => unit.id !== pendingUnit);
+const searchKey = value => value.trim().normalize('NFD').replace(/\p{Diacritic}/gu,'').toLocaleLowerCase('ca');
+let busy = false;
+
+function setTheme(value) {
+  document.documentElement.dataset.theme = value;
+  theme.setAttribute('aria-pressed', value === 'dark');
+}
+setTheme(localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+theme.onclick = () => {
+  const value = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme',value);
+  setTheme(value);
+};
+
+function escape(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+const byId = (type,id) => data[type].find(item => item.id === id);
+const options = (items, selected, label) => '<option value="">'+label+'</option>' + items.map(item =>
+  '<option value="'+escape(item.id)+'" '+(item.id === selected ? 'selected' : '')+'>'+escape(item.name)+'</option>').join('');
+const empty = message => '<p class="meta">'+message+'</p>';
+
+async function api(body) {
+  if (request) return request(body);
+  const response = await fetch('/api', body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {});
+  const result = await response.json();
+  if (!response.ok) throw Object.assign(new Error(result.error),{status:response.status});
+  return result;
+}
+
+function notify(message, error = false) {
+  status.textContent = message;
+  status.classList.toggle('error',error);
+}
+
+async function save(payload, done, button, success = () => 'Canvis desats.', afterRender) {
+  if (busy) return;
+  busy = true;
+  setSync('Desant…');
+  if (button) button.disabled = true;
+  let saved = false;
+  try {
+    const result = await api(payload);
+    saved = true;
+    done?.(result);
+    data = await api();
+    setSync('Sincronitzat');
+    notify(success(result));
+    render();
+    afterRender?.();
+  } catch (error) {
+    setSync('Revisa l’últim canvi');
+    if (error.status === 409 && ['draft','order'].includes(payload.action)) {
+      try {
+        data = await api();
+        render();
+      } catch {
+        // Keep the previous view available if the refresh fails.
+      }
+    }
+    notify(saved ? 'El canvi s’ha desat. Recarrega la pàgina per veure’l.' : error.message,true);
+  } finally {
+    busy = false;
+    if (button) button.disabled = false;
+  }
+}
+
+function catalog() {
+  const current = byId(section,edit);
+  const isSupplier = section === 'suppliers';
+  const title = current ? 'Edita ' + current.name : {suppliers:'Nou proveïdor',articles:'Nou article',units:'Nova unitat',categories:'Nova categoria'}[section];
+  const isArticle = section === 'articles';
+  const filters = isArticle ? '<div id="article-filters" class="grid">'+
+    '<label>Cerca per nom<input id="article-search" type="search" value="'+escape(articleSearch)+'"></label>'+
+    '<label>Proveïdor<select id="supplier-filter">'+options(data.suppliers,supplierFilter,'Tots els proveïdors')+'</select></label>'+
+    '<label>Categoria<select id="category-filter">'+options(data.categories,categoryFilter,'Totes les categories')+'<option value="-" '+(categoryFilter === '-' ? 'selected' : '')+'>Sense categoria</option></select></label></div>' : '';
+  return '<article class="card"><h2>'+escape(title)+'</h2><form id="catalog"><div class="grid">'+
+    '<label>Nom<input name="name" required maxlength="120" value="'+escape(current?.name)+'"></label>'+
+    (isSupplier ? '<label>WhatsApp amb prefix internacional<input name="phone" type="tel" placeholder="+34 600 000 000" value="'+(current?.phone ? '+'+escape(current.phone) : '')+'"></label>' : '')+
+    (isArticle ? '<label>Categoria<select name="category">'+options(data.categories,current?.category_id,'Sense categoria')+'</select></label><label>Unitat de compra<select name="unit">'+options(data.units.filter(unit => unit.id !== pendingUnit),current?.unit_id,'Sense unitat')+'</select></label>' : '')+
+    (isSupplier ? '<label>Nom del comercial<input name="contact" maxlength="120" value="'+escape(current?.contact)+'"></label>' : '')+
+    '</div>'+
+    (isSupplier ? contactControls()+'<label>Missatge de WhatsApp<textarea name="messageTemplate" maxlength="1000" rows="4" placeholder="Bon dia, {comercial}! Us voldríem fer aquesta comanda:">'+escape(current?.message_template)+'</textarea></label>'+
+      '<p class="meta">Pots fer servir <code>{comercial}</code>, <code>{proveidor}</code> i <code>{articles}</code>. Si deixes el missatge buit, s’utilitzarà el text per defecte.</p>' : '')+
+    '<div class="actions"><button class="primary">Desa</button>'+(current ? '<button type="button" data-cancel>Cancel·la</button>' : '')+'</div></form></article>'+
+    (section === 'articles' && current ? offerEditor(current) : '')+
+    (isArticle ? pdfImportCard() : '')+
+    '<article class="card"><h2>'+sections[section]+'</h2>'+filters+'<div id="catalog-rows">'+
+    catalogRows()+'</div></article>';
+}
+
+function pdfImportCard() {
+  const review = pdfReview;
+  const upload = '<form id="read-catalog"><label>Catàleg del proveïdor (PDF)<input name="file" type="file" accept=".pdf,application/pdf" required></label>'+
+    '<button type="submit"'+(readingPdf ? ' disabled' : '')+'>Llegeix el PDF</button></form>';
+  return '<article class="card"><details'+(review || readingPdf ? ' open' : '')+'><summary>Importa un catàleg en PDF</summary>'+
+    (review ? pdfReviewForm(review) : upload)+'</details></article>';
+}
+
+function pdfReviewForm(review) {
+  const categoryChoices = data.categories.map(item => '<option value="'+escape(item.name)+'"></option>').join('');
+  const unitChoices = purchaseUnits().map(item => '<option value="'+escape(item.name)+'"></option>').join('');
+  return '<form id="confirm-pdf"><div class="grid"><label>Proveïdor<select name="supplier" id="pdf-supplier" required>'+
+    options(data.suppliers,review.supplier,review.supplier ? 'Tria un proveïdor' : 'No identificat · tria el proveïdor')+
+    '<option value="new">Nou proveïdor…</option></select></label>'+
+    '<label id="pdf-new-supplier" hidden>Nom del proveïdor<input name="newSupplier" maxlength="120"></label></div>'+
+    '<p class="meta">'+review.rows.length+' files detectades. Revisa els noms i desmarca les que no siguin articles.'+
+      (review.scanned ? ' El PDF inclou pàgines escanejades.' : '')+'</p>'+
+    '<datalist id="pdf-categories">'+categoryChoices+'</datalist><datalist id="pdf-units">'+unitChoices+'</datalist>'+
+    '<div class="pdf-rows" role="group" aria-label="Articles detectats">'+review.rows.map((row,index) =>
+      '<div class="pdf-row"><label class="pdf-select"><input type="checkbox" name="include" aria-label="Inclou la fila '+(index+1)+'"'+
+      (row.include ? ' checked' : '')+'> Pàg. '+row.page+'</label>'+
+      '<label>Article<input name="name" maxlength="120" value="'+escape(row.name)+'"></label>'+
+      '<label>Categoria<input name="category" list="pdf-categories" maxlength="120" value="'+escape(row.category)+'"></label>'+
+      '<label>Unitat<input name="unit" list="pdf-units" maxlength="120" value="'+escape(row.unit)+'"></label></div>'
+    ).join('')+'</div><div class="actions"><button class="primary">Importa els articles marcats</button>'+
+    '<button type="button" data-cancel-pdf>Cancel·la</button></div></form>';
+}
+
+async function analyzeCatalog(form, button) {
+  if (busy || readingPdf) return;
+  readingPdf = true;
+  button.disabled = true;
+  notify('Obrint el PDF…');
+  try {
+    const review = await readCatalogPdf(form.elements.file.files[0],data,progress => {
+      if (section === 'articles') notify(progress);
+    });
+    if (!review.rows.length) throw new Error('No s’han detectat articles en aquest PDF.');
+    pdfReview = review;
+    if (section === 'articles') {
+      notify(review.supplier ? 'Revisa el proveïdor i els articles abans d’importar.' : 'Selecciona el proveïdor abans d’importar els articles.');
+      render();
+      document.querySelector('#pdf-supplier')?.focus();
+    }
+  } catch (error) {
+    if (section === 'articles') notify(error.message || 'No s’ha pogut llegir el PDF.',true);
+  } finally {
+    readingPdf = false;
+    button.disabled = false;
+  }
+}
+
+async function importReviewedCatalog(form, button) {
+  if (busy) return;
+  const supplier = form.elements.supplier.value === 'new' ? form.elements.newSupplier.value.trim() :
+    byId('suppliers',form.elements.supplier.value)?.name;
+  const articles = [...form.querySelectorAll('.pdf-row')].filter(row => row.querySelector('[name=include]').checked).map(row => ({
+    name:row.querySelector('[name=name]').value.trim(),
+    category:row.querySelector('[name=category]').value.trim(),
+    unit:row.querySelector('[name=unit]').value.trim(),
+    supplier
+  }));
+  if (!supplier || !articles.length || articles.some(article => !article.name)) {
+    notify('Indica el proveïdor i marca les files que vols importar. Cada article ha de tenir nom.',true);
+    return;
+  }
+  const batches = [];
+  for (let index=0;index<articles.length;index+=150) batches.push(articles.slice(index,index+150));
+  const totals = {imported:0,suppliers:0,links:0};
+  busy = true;
+  button.disabled = true;
+  setSync('Desant…');
+  try {
+    for (const [index,batch] of batches.entries()) {
+      notify('Important articles · '+(index+1)+' de '+batches.length+'…');
+      const result = await api({action:'importCatalog',articles:batch});
+      for (const key of Object.keys(totals)) totals[key] += result[key];
+    }
+    data = await api();
+    pdfReview = null;
+    setSync('Sincronitzat');
+    notify(totals.imported+' articles nous i '+totals.links+' opcions de compra desades per a '+supplier+'.');
+    render();
+  } catch (error) {
+    setSync('Revisa la importació');
+    notify(error.message+' Pots tornar a prémer Importa per completar les files pendents.',true);
+  } finally {
+    busy = false;
+    button.disabled = false;
+  }
+}
+
+function draftArticleIds() {
+  return new Set(data.draft.lines.map(line => line.article));
+}
+
+const draftBadge = '<span class="draft-badge">✓ A la comanda</span>';
+
+function catalogRows() {
+  const isArticle = section === 'articles';
+  const isSupplier = section === 'suppliers';
+  const query = searchKey(articleSearch);
+  const added = isArticle ? draftArticleIds() : null;
+  const names = {suppliers:'proveïdor',articles:'article',units:'unitat',categories:'categoria'};
+  return data[section].filter(item => item.id !== pendingUnit).map(item => {
+    const linked = isArticle ? data.offers.filter(offer => offer.article_id === item.id) : [];
+    if (isArticle && ((categoryFilter && (item.category_id || '-') !== categoryFilter) ||
+        (supplierFilter && !linked.some(offer => offer.supplier_id === supplierFilter)) || !searchKey(item.name).includes(query))) return '';
+    const detail = isSupplier ? [item.contact,item.phone ? '+'+item.phone : 'Tria el contacte a WhatsApp'].filter(Boolean).join(' · ') :
+      isArticle ? [byId('categories',item.category_id)?.name,byId('units',item.unit_id)?.name,
+        linked.map(offer => byId('suppliers',offer.supplier_id)?.name).filter(Boolean).join(' · ') || 'Sense proveïdors'].filter(Boolean).join(' · ') : '';
+    const browse = isSupplier || section === 'categories'
+      ? '<button data-browse-articles="'+escape(item.id)+'">Mostra els articles</button>' : '';
+    const order = isArticle ? '<button data-add-article="'+escape(item.id)+'" aria-expanded="'+(addingArticle === item.id)+'"'+
+      (linked.length ? '' : ' disabled')+'>Afegeix a la comanda</button>' : '';
+    const inDraft = added?.has(item.id);
+    return '<div class="item'+(inDraft ? ' in-draft' : '')+'"><div class="row"><div><strong>'+escape(item.name)+'</strong>'+
+      (inDraft ? draftBadge : '')+(detail ? '<div class="meta">'+escape(detail)+'</div>' : '')+'</div><div class="actions">'+order+browse+
+      '<button data-edit="'+escape(item.id)+'">Edita</button></div></div>'+
+      (isArticle && addingArticle === item.id ? catalogLine(item,linked) : '')+'</div>';
+  }).join('') || empty('Cap '+names[section]+' per mostrar.');
+}
+
+function catalogLine(article, offers) {
+  const supplier = offers.find(offer => offer.supplier_id === supplierFilter) || (offers.length === 1 ? offers[0] : null);
+  const suppliers = offers.map(offer => byId('suppliers',offer.supplier_id)).filter(Boolean);
+  return '<form id="catalog-line" class="catalog-line" aria-label="Afegeix '+escape(article.name)+' a la comanda">'+
+    '<input type="hidden" name="article" value="'+escape(article.id)+'"><div class="grid">'+
+    '<label>Proveïdor<select name="supplier" required>'+options(suppliers,supplier?.supplier_id,'Tria un proveïdor')+'</select></label>'+
+    '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" value="1" required></label>'+
+    '<label>Unitat<select name="unit" required>'+options(purchaseUnits(),offerUnit(article,supplier),'Tria una unitat')+'</select></label></div>'+
+    '<div class="actions"><button class="primary">Afegeix la línia</button><button type="button" data-close-line>Cancel·la</button></div></form>';
+}
+
+function offerUnit(article, offer) {
+  return offer && offer.unit_id !== pendingUnit ? offer.unit_id : article?.unit_id || '';
+}
+
+function offerEditor(article) {
+  const linked = data.offers.filter(offer => offer.article_id === article.id);
+  return '<article class="card"><h2>Proveïdors de '+escape(article.name)+'</h2>'+
+    (data.suppliers.length ? '<form id="offer"><div class="grid"><label>Proveïdor<select required name="supplier">'+options(data.suppliers,'','Tria un proveïdor')+'</select></label>'+
+      '<label>Unitat de compra<select required name="unit">'+options(data.units.filter(unit => unit.id !== pendingUnit),article.unit_id,'Tria una unitat')+'</select></label></div><button class="primary">Desa l’opció de compra</button></form>' :
+      '<p>Crea un proveïdor per associar-lo a aquest article.</p><button data-tab="suppliers">Ves a Proveïdors</button>')+
+    linked.map(offer => '<div class="row item"><span>'+escape(byId('suppliers',offer.supplier_id)?.name)+' · '+escape(byId('units',offer.unit_id)?.name)+'</span><button class="remove" data-unlink="'+escape(offer.supplier_id)+'">Desvincula</button></div>').join('')+'</article>';
+}
+
+function orderMatches() {
+  const query = searchKey(orderSearch);
+  return data.articles.filter(article => searchKey(article.name).includes(query));
+}
+
+function order() {
+  const draft = data.draft.lines;
+  const quickArticle = creatingArticle ? '<form id="quick-article" class="item"><h3>Nou article</h3><div class="grid">'+
+    '<label>Nom<input name="name" required maxlength="120" value="'+escape(orderSearch.trim())+'"></label>'+
+    '<label>Categoria<select name="category">'+options(data.categories,'','Sense categoria')+'</select></label>'+
+    '<label>Proveïdor<select name="supplier" required>'+options(data.suppliers,'','Tria un proveïdor')+'</select></label>'+
+    '<label>Unitat de compra<select name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label></div>'+
+    '<div class="actions">'+(data.suppliers.length ? '<button class="primary">Crea l’article</button>' : '<button type="button" data-tab="suppliers">Dona d’alta un proveïdor</button>')+
+    '<button id="cancel-quick" type="button">Cancel·la</button></div></form>' : '';
+  return '<article class="card"><h2>Nova comanda</h2>'+
+    '<div class="order-lookup"><label>Cerca un article<input id="order-search" type="search" aria-controls="order-matches" autocomplete="off" value="'+escape(orderSearch)+'"></label>'+
+    '<div id="order-matches" class="order-matches" role="group" aria-label="Articles trobats" hidden></div>'+
+    '<p id="order-match-status" class="meta" role="status"></p></div>'+
+    '<div class="actions"><button id="quick-toggle" aria-expanded="'+creatingArticle+'">Nou article</button></div>'+quickArticle+
+    '<form id="line"><input type="hidden" id="article" name="article"><div class="grid">'+
+    '<label>Proveïdor<select id="supplier" required name="supplier"></select></label>'+
+    '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" value="1" required></label>'+
+    '<label>Unitat<select id="line-unit" name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label>'+
+    '</div><p id="order-supplier-status" class="meta"></p><button id="add-line">Afegeix la línia</button></form>'+
+    '</article><article class="card order-lines"><h2>Línies de la comanda</h2>'+
+    (draft.map((line,index) => {
+      const name = escape(byId('articles',line.article)?.name);
+      const number = index+1;
+      return '<div class="item draft-line"><div class="draft-description">'+
+        '<details class="draft-name"><summary title="'+name+'">'+name+'</summary><div>'+name+'</div></details>'+
+        '<div class="meta">'+escape(byId('suppliers',line.supplier)?.name)+'</div></div>'+
+        '<button type="button" class="remove draft-remove" data-remove="'+index+'" aria-label="Treu '+name+'"><span aria-hidden="true">×</span></button>'+
+        '<form class="draft-quantity-form" data-edit-quantity="'+index+'">'+
+        '<label>Quantitat<input name="quantity" aria-label="Quantitat de la línia '+number+'" type="number" step="any" inputmode="decimal" required value="'+escape(line.quantity)+'"></label>'+
+        '<label>Unitat<select name="unit" required aria-label="Unitat de la línia '+number+'">'+
+        options(purchaseUnits(),line.unit,'Tria una unitat')+'</select></label>'+
+        '<button type="submit" aria-label="Desa la línia '+number+'">Desa</button></form></div>';
+    }).join('') || empty('Encara no hi ha cap línia.'))+
+    (draft.length ? '<div class="actions item"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+'</article>';
+}
+
+function orderOptions() {
+  const matches = orderSearch.trim() && showMatches ? orderMatches() : [];
+  const results = document.querySelector('#order-matches');
+  results.hidden = !matches.length;
+  const added = draftArticleIds();
+  results.innerHTML = matches.map(article => {
+    const category = byId('categories',article.category_id)?.name;
+    const inDraft = added.has(article.id);
+    return '<button type="button" data-pick-article="'+escape(article.id)+'"'+(inDraft ? ' class="in-draft"' : '')+'>'+escape(article.name)+
+      (inDraft ? draftBadge : '')+(category ? '<span class="meta">'+escape(category)+'</span>' : '')+'</button>';
+  }).join('');
+  const selected = byId('articles',orderArticle);
+  document.querySelector('#article').value = selected?.id || '';
+  document.querySelector('#order-match-status').textContent = selected ? 'Article triat: '+selected.name+(added.has(selected.id) ? ' · Ja és a la comanda.' : '') :
+    orderSearch.trim() && !matches.length ? 'Cap article coincideix amb la cerca. Pots crear-lo amb «Nou article».' : '';
+  supplierOptions();
+}
+
+async function pickOrderArticle(id) {
+  if (busy) return;
+  const article = byId('articles',id);
+  if (!article) return;
+  orderArticle = id;
+  orderSearch = article.name;
+  showMatches = false;
+  document.querySelector('#order-search').value = orderSearch;
+  orderOptions();
+  await addSelectedArticle();
+}
+
+async function addSelectedArticle() {
+  const form = document.querySelector('#line');
+  const {supplier, unit, quantity} = form.elements;
+  if (!supplier.value) {
+    (supplier.disabled ? document.querySelector('#order-search') : supplier).focus();
+    return;
+  }
+  if (!unit.value) {
+    unit.focus();
+    return;
+  }
+  await addDraftLine(form,{article:orderArticle,supplier:supplier.value,unit:unit.value,quantity:quantity.valueAsNumber});
+}
+
+function supplierOptions() {
+  const select = document.querySelector('#supplier');
+  const offers = data.offers.filter(offer => offer.article_id === orderArticle);
+  select.innerHTML = options(offers.map(offer => byId('suppliers',offer.supplier_id)).filter(Boolean),
+    offers.length === 1 ? offers[0].supplier_id : '', 'Tria un proveïdor');
+  select.form.hidden = !orderArticle;
+  select.disabled = !offers.length;
+  document.querySelector('#add-line').disabled = !offers.length;
+  document.querySelector('#order-supplier-status').textContent = orderArticle && !offers.length ? 'Aquest article encara no té cap proveïdor assignat.' : '';
+  defaultUnit();
+}
+
+function defaultUnit() {
+  const supplier = document.querySelector('#supplier').value;
+  const offer = data.offers.find(item => item.article_id === orderArticle && item.supplier_id === supplier);
+  document.querySelector('#line-unit').value = offerUnit(byId('articles',orderArticle),offer);
+}
+
+function saveDraft(lines, button) {
+  return save({action:'draft',lines,revision:data.draft.revision},null,button,()=>'Esborrany desat.');
+}
+
+function history() {
+  const orders = Map.groupBy(data.lines, line => line.order_id);
+  return '<article class="card"><h2>Historial de comandes</h2>'+
+    ([...orders].map(([id, lines]) => {
+      const groups = Map.groupBy(lines,line => line.supplier_id);
+      return '<div class="item"><div class="row"><div><strong>'+escape(dateFormat.format(new Date(lines[0].created_at)))+'</strong><div class="meta">'+
+        lines.length+' '+(lines.length === 1 ? 'línia' : 'línies')+' · '+groups.size+' '+(groups.size === 1 ? 'proveïdor' : 'proveïdors')+
+        '</div><div class="meta">'+(lines[0].author_email ? 'Desada per '+escape(lines[0].author_email) : 'Autor sense registrar')+'</div></div><button data-order="'+escape(id)+'" aria-expanded="'+(id === openOrder)+'">'+(id === openOrder ? 'Amaga' : 'Mostra els missatges')+'</button></div>'+
+        (id === openOrder ? [...groups.values()].map(messageCard).join('') : '')+'</div>';
+    }).join('') || empty('Encara no hi ha comandes desades.'))+'</article>';
+}
+
+function contactControls() {
+  return '<div class="contact-actions actions">'+
+    (typeof navigator.contacts?.select === 'function' ? '<button type="button" data-pick-contact>Tria de l’agenda</button>' : '')+
+    '<label class="button contact-file">Importa una targeta de contacte<input type="file" data-contact-file accept=".vcf,text/vcard,text/x-vcard"></label>'+
+    '<label data-contact-choice hidden>Telèfon del contacte<select></select></label></div>';
+}
+
+function fillContact(form, contact) {
+  const phones = [...new Set((contact.tel || []).map(whatsappPhone).filter(Boolean))];
+  if (!phones.length) {
+    notify('El contacte no té cap telèfon vàlid. Escriu el número amb el prefix internacional.',true);
+    return;
+  }
+  if (contact.name) form.elements.contact.value = contact.name.slice(0,120);
+  const choice = form.querySelector('[data-contact-choice]');
+  choice.hidden = phones.length < 2;
+  choice.querySelector('select').innerHTML = options(phones.map(phone => ({id:phone,name:'+'+phone})),'','Tria un telèfon');
+  form.elements.phone.value = phones.length === 1 ? '+'+phones[0] : '';
+  if (phones.length > 1) choice.querySelector('select').focus();
+  notify(phones.length > 1 ? 'Tria quin número de l’agenda vols fer servir.' : '');
+}
+
+function whatsappLink(phone, message) {
+  return 'https://wa.me/'+phone+'?text='+encodeURIComponent(message);
+}
+
+function supplierMessage(lines, current, recipient) {
+  const supplier = lines[0];
+  const articles = lines.map(line => '• '+quantityFormat.format(line.quantity)+' '+line.unit+' de '+line.article).join('\n');
+  const contact = recipient || current?.contact || supplier.contact;
+  const template = supplier.message_template ?? current?.message_template;
+  const hello = contact ? 'Bon dia, '+contact+'!' : 'Bon dia!';
+  if (!template) return hello+' Us voldríem fer aquesta comanda:\n\n'+articles+'\n\nGràcies!';
+  const values = {comercial:contact || supplier.supplier,proveidor:supplier.supplier,articles};
+  const text = template.replace(/\{(comercial|proveidor|articles)\}/g,(_, key) => values[key]);
+  return template.includes('{articles}') ? text : text+'\n\n'+articles;
+}
+
+function messageCard(lines) {
+  const supplier = lines[0];
+  const current = byId('suppliers',supplier.supplier_id);
+  const phone = current?.phone || supplier.phone || '';
+  const message = supplierMessage(lines,current);
+  const chooser = !phone && current ? '<details class="recipient-picker"><summary class="button whatsapp">Tria el contacte per a WhatsApp</summary>'+
+    '<form data-order-recipient data-order-id="'+escape(supplier.order_id)+'" data-supplier-id="'+escape(supplier.supplier_id)+'">'+
+    '<div class="grid"><label>Nom del comercial<input name="contact" maxlength="120" value="'+escape(current.contact)+'"></label>'+
+    '<label>Telèfon de WhatsApp<input name="phone" type="tel" placeholder="+34 600 000 000" required></label></div>'+
+    contactControls()+'<label class="remember-contact"><input name="remember" type="checkbox"> Vols desar aquest contacte per a les properes comandes?</label>'+
+    '<button class="primary" type="submit">Obre WhatsApp</button></form></details>' :
+    '<a class="button whatsapp" href="'+escape(whatsappLink(phone,message))+'">Obre WhatsApp</a>';
+  return '<section class="item"><h3>'+escape(supplier.supplier)+'</h3><label>Missatge<textarea readonly rows="'+Math.min(13,lines.length+4)+'">'+escape(message)+'</textarea></label>'+
+    '<div class="actions"><button data-copy>Copia el missatge</button>'+
+    (!phone && current ? '<a href="'+escape(whatsappLink('',message))+'">Tria dins de WhatsApp</a>' : '')+'</div>'+chooser+'</section>';
+}
+
+async function openOrderRecipient(form, button) {
+  if (busy) return;
+  const phone = whatsappPhone(form.elements.phone.value);
+  if (!phone) {
+    notify('Indica un número de WhatsApp amb el prefix internacional.',true);
+    form.elements.phone.focus();
+    return;
+  }
+  const supplier = byId('suppliers',form.dataset.supplierId);
+  const lines = data.lines.filter(line => line.order_id === form.dataset.orderId && line.supplier_id === supplier?.id);
+  if (!lines.length) return;
+  const contact = form.elements.contact.value.trim();
+  const link = whatsappLink(phone,supplierMessage(lines,supplier,contact));
+  if (form.elements.remember.checked) {
+    let saved = false;
+    await save({action:'assignSupplierContact',id:supplier.id,phone,contact},() => {saved = true;},button,()=>'Contacte desat per a les properes comandes.');
+    if (!saved) return;
+  }
+  location.assign(link);
+}
+
+function staff() {
+  return '<article class="card"><h2>Accés de l’equip</h2>'+
+    '<p class="meta">Ets l’administrador de NexaComandes. Pots autoritzar usuaris i retirar-los l’accés.</p>'+
+    '<form id="staff-access"><div class="grid"><label>Correu del treballador<input type="email" name="email" autocomplete="off" required></label></div>'+
+    '<button class="primary">Autoritza</button></form>'+
+    (data.staff.map(person => '<div class="row item"><span>'+escape(person.email)+'</span><button data-remove-staff="'+escape(person.email)+'">Retira l’accés</button></div>').join('') ||
+      empty('Encara no hi ha treballadors autoritzats.'))+'</article>';
+}
+
+function render() {
+  menuButton.hidden = false;
+  const tabsToShow = data.staff ? {...sections,staff:'Equip'} : sections;
+  tabs.innerHTML = Object.entries(tabsToShow).map(([key,label]) => '<button data-tab="'+key+'" '+(section === key ? 'aria-current="page"' : '')+'>'+label+'</button>').join('');
+  content.innerHTML = section === 'order' ? order() : section === 'history' ? history() : section === 'staff' ? staff() : catalog();
+  if (section === 'order') orderOptions();
+}
+
+document.addEventListener('click',async event => {
+  const button = event.target.closest('button');
+  if (!button || button.id === 'theme' || !data || busy) return;
+  const target = button.dataset;
+  if (target.tab) {
+    if (tabs.contains(button)) {
+      setMenu(false);
+      menuButton.focus();
+    }
+    section = target.tab;
+    addingArticle = '';
+    edit = '';
+    notify('');
+    render();
+  } else if (Object.hasOwn(target,'cancelPdf')) {
+    pdfReview = null;
+    notify('');
+    render();
+  } else if (target.browseArticles) {
+    supplierFilter = section === 'suppliers' ? target.browseArticles : '';
+    categoryFilter = section === 'categories' ? target.browseArticles : '';
+    articleSearch = '';
+    addingArticle = '';
+    edit = '';
+    section = 'articles';
+    notify('');
+    render();
+    const search = document.querySelector('#article-search');
+    search.scrollIntoView({block:'nearest'});
+    search.focus();
+  } else if (target.addArticle || Object.hasOwn(target,'closeLine')) {
+    const article = target.addArticle || addingArticle;
+    addingArticle = addingArticle === article ? '' : article;
+    refreshCatalogRows();
+    const line = document.querySelector('#catalog-line');
+    if (line) (line.elements.supplier.value ? line.elements.quantity : line.elements.supplier).focus();
+    else [...content.querySelectorAll('[data-add-article]')].find(item => item.dataset.addArticle === article)?.focus();
+  } else if (target.edit || Object.hasOwn(target,'cancel')) {
+    edit = target.edit || '';
+    render();
+    document.querySelector('#catalog input').focus();
+    document.querySelector('#catalog').scrollIntoView({block:'nearest'});
+  } else if (Object.hasOwn(target,'pickContact')) {
+    try {
+      const [contact] = await navigator.contacts.select(['name','tel'],{multiple:false});
+      if (contact && button.form.isConnected) fillContact(button.form,{name:contact.name?.[0],tel:contact.tel});
+    } catch (error) {
+      if (error.name !== 'AbortError') notify('Pots importar una targeta de contacte o escriure el número.',true);
+    }
+  } else if (target.removeStaff) {
+    await save({action:'staffRemove',email:target.removeStaff},null,button);
+  } else if (target.pickArticle) {
+    await pickOrderArticle(target.pickArticle);
+  } else if (button.id === 'quick-toggle' || button.id === 'cancel-quick') {
+    creatingArticle = !creatingArticle;
+    render();
+    document.querySelector(creatingArticle ? '#quick-article input' : '#order-search').focus();
+  } else if (target.unlink) {
+    await save({action:'unlink',article:edit,supplier:target.unlink},null,button);
+  } else if (Object.hasOwn(target,'remove')) {
+    await saveDraft(data.draft.lines.filter((_,index) => index !== Number(target.remove)),button);
+  } else if (button.id === 'generate') {
+    const pending = [...content.querySelectorAll('[data-edit-quantity]')].find(form => {
+      const line = data.draft.lines[Number(form.dataset.editQuantity)];
+      return form.elements.quantity.valueAsNumber !== line.quantity || form.elements.unit.value !== line.unit;
+    });
+    if (pending) {
+      notify('Desa els canvis de la línia abans de generar els missatges.',true);
+      const line = data.draft.lines[Number(pending.dataset.editQuantity)];
+      (pending.elements.unit.value !== line.unit ? pending.elements.unit : pending.elements.quantity).focus();
+      return;
+    }
+    await save({action:'order',revision:data.draft.revision}, result => {
+      section = 'history';
+      openOrder = result.id;
+    },button);
+  } else if (target.order) {
+    openOrder = openOrder === target.order ? '' : target.order;
+    render();
+    [...content.querySelectorAll('[data-order]')].find(item => item.dataset.order === target.order)?.focus();
+  } else if (Object.hasOwn(target,'copy')) {
+    const field = button.closest('section').querySelector('textarea');
+    try {
+      await navigator.clipboard.writeText(field.value);
+      notify('Missatge copiat.');
+    } catch {
+      field.select();
+      notify('Seleccionat. Pots copiar el missatge manualment.');
+    }
+  }
+});
+
+document.addEventListener('change', async event => {
+  if (event.target.matches('[data-contact-choice] select')) {
+    event.target.form.elements.phone.value = event.target.value ? '+'+event.target.value : '';
+    return;
+  }
+  if (Object.hasOwn(event.target.dataset,'contactFile')) {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const contact = file.size <= 256*1024 ? vCardContact(await file.text()) : null;
+      if (!event.target.isConnected) return;
+      if (!contact) throw new Error();
+      fillContact(event.target.form,contact);
+    } catch {
+      notify('Tria una targeta .vcf amb un sol contacte.',true);
+    } finally {
+      event.target.value = '';
+    }
+    return;
+  }
+  if (event.target.id === 'pdf-supplier') {
+    const field = event.target.form.elements.newSupplier;
+    field.closest('label').hidden = event.target.value !== 'new';
+    field.required = event.target.value === 'new';
+    if (field.required) field.focus();
+  }
+  if (event.target.id === 'supplier') defaultUnit();
+  if (event.target.matches('#supplier, #line-unit')) await addSelectedArticle();
+  if (event.target.id === 'category-filter' || event.target.id === 'supplier-filter') {
+    if (event.target.id === 'category-filter') categoryFilter = event.target.value;
+    else supplierFilter = event.target.value;
+    addingArticle = '';
+    refreshCatalogRows();
+  }
+  if (event.target.matches('#catalog-line select[name=supplier]')) {
+    const form = event.target.form;
+    const article = byId('articles',form.elements.article.value);
+    const offer = data.offers.find(item => item.article_id === article.id && item.supplier_id === event.target.value);
+    form.elements.unit.value = offerUnit(article,offer);
+  }
+  if (event.target.matches('#offer select[name=supplier]')) {
+    const offer = data.offers.find(item => item.article_id === edit && item.supplier_id === event.target.value);
+    document.querySelector('#offer select[name=unit]').value = offer && offer.unit_id !== pendingUnit ? offer.unit_id : byId('articles',edit)?.unit_id || '';
+  }
+});
+
+function refreshCatalogRows() {
+  document.querySelector('#catalog-rows').innerHTML = catalogRows();
+}
+
+document.addEventListener('input', event => {
+  if (event.target.id === 'order-search') {
+    orderSearch = event.target.value;
+    orderArticle = '';
+    showMatches = true;
+    orderOptions();
+  }
+  if (event.target.id !== 'article-search') return;
+  articleSearch = event.target.value;
+  addingArticle = '';
+  refreshCatalogRows();
+});
+
+document.addEventListener('keydown', event => {
+  if (event.target.id !== 'order-search' || !['ArrowDown','Enter'].includes(event.key)) return;
+  const first = document.querySelector('#order-matches button');
+  if (!first) return;
+  event.preventDefault();
+  if (event.key === 'Enter') pickOrderArticle(first.dataset.pickArticle);
+  else first.focus();
+});
+
+document.addEventListener('submit',async event => {
+  const form = event.target;
+  if (!form.closest('#workspace')) return;
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(form));
+  if (Object.hasOwn(form.dataset,'orderRecipient')) {
+    await openOrderRecipient(form,event.submitter);
+  } else if (Object.hasOwn(form.dataset,'editQuantity')) {
+    const index = Number(form.dataset.editQuantity);
+    const quantity = form.elements.quantity.valueAsNumber;
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      notify('La quantitat ha de ser un número més gran que zero.',true);
+      return;
+    }
+    await saveDraft(data.draft.lines.map((line,position) => position === index ? {...line,quantity,unit:values.unit} : line),event.submitter);
+  } else if (form.id === 'staff-access') {
+    await save({action:'staffAdd',email:values.email},null,event.submitter);
+  } else if (form.id === 'read-catalog') {
+    await analyzeCatalog(form,event.submitter);
+  } else if (form.id === 'confirm-pdf') {
+    await importReviewedCatalog(form,event.submitter);
+  } else if (form.id === 'catalog') {
+    if (section === 'suppliers' && values.phone.trim()) {
+      values.phone = whatsappPhone(values.phone);
+      if (!values.phone) {
+        notify('Indica un número de WhatsApp vàlid.',true);
+        form.elements.phone.focus();
+        return;
+      }
+    }
+    await save({...values,action:section,id:edit},result => {
+      edit = section === 'articles' ? result.id : '';
+    },event.submitter);
+  } else if (form.id === 'offer') {
+    await save({...values,action:'offer',article:edit},null,event.submitter);
+  } else if (form.id === 'quick-article') {
+    await save({...values,action:'quickArticle'},result => {
+      orderArticle = result.id;
+      orderSearch = values.name.trim();
+      showMatches = false;
+      creatingArticle = false;
+    },event.submitter,()=>'Article creat. Ja el pots afegir a la comanda.');
+  } else if (form.id === 'line' || form.id === 'catalog-line') {
+    await addDraftLine(form,values,event.submitter);
+  }
+});
+
+async function addDraftLine(form, values, button) {
+  const {article,supplier,unit} = values;
+  const quantity = Number(values.quantity);
+  const offer = data.offers.find(item => item.article_id === article && item.supplier_id === supplier);
+  if (!offer || !unit || !Number.isFinite(quantity) || quantity <= 0) {
+    notify('Tria un article, un proveïdor i una unitat, i indica una quantitat positiva.',true);
+    return;
+  }
+  const matches = line => line.article === article && line.supplier === supplier && line.unit === unit;
+  const lines = combineDraftLines([...data.draft.lines,{article,supplier,unit,quantity}]);
+  if (lines.length > 100 || lines.some(line => !Number.isFinite(line.quantity))) {
+    notify('Revisa el total de la quantitat. La comanda admet fins a 100 línies.',true);
+    return;
+  }
+  const fromCatalog = form.id === 'catalog-line';
+  await save({action:'draft',lines,revision:data.draft.revision},() => {
+    if (fromCatalog) {
+      addingArticle = '';
+    } else {
+      orderArticle = '';
+      orderSearch = '';
+      showMatches = false;
+    }
+  },button,()=>'Article afegit a la comanda.',() => {
+    if (fromCatalog) return;
+    const index = data.draft.lines.findIndex(matches);
+    const field = content.querySelector('[data-edit-quantity="'+index+'"] input');
+    field?.focus();
+    field?.select();
+  });
+}
+
+if (!initialData) setSync('Carregant…');
+(initialData ? Promise.resolve(initialData) : api()).then(result => {
+  data = result;
+  setSync('Sincronitzat');
+  notify('');
+  render();
+}).catch(error => {
+  setSync('Sense connexió');
+  notify('No s’han pogut carregar les dades. '+error.message,true);
+});
+
+}
+
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendEmailVerification, sendPasswordResetEmail, signOut, reload, checkActionCode, applyActionCode, verifyPasswordResetCode, confirmPasswordReset
+} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js';
+
+async function startStaffApp(apiOrigin, mountApp) {
+  const panel = document.querySelector('#login-panel');
+  const form = document.querySelector('#login-form');
+  const message = document.querySelector('#login-status');
+  const actions = document.querySelector('#verify-actions');
+  const repair = document.querySelector('#verify-link-form');
+  const resetPanel = document.querySelector('#reset-panel');
+  const resetForm = document.querySelector('#reset-link-form');
+  const logout = document.querySelector('#logout');
+  const workspace = document.querySelector('#workspace');
+  let auth;
+  let mounted = false;
+  let busy = false;
+  const emailAction = new URL(location.href);
+  const incomingMode = emailAction.searchParams.get('mode');
+  let actionMode = ['verifyEmail','resetPassword'].includes(incomingMode) && emailAction.searchParams.get('oobCode') ? incomingMode : '';
+  if (actionMode) history.replaceState(null,'',location.pathname);
+
+  function show(text) {
+    message.textContent = text;
+  }
+
+  function errorMessage(error) {
+    switch (error.code) {
+      case 'auth/invalid-credential': return 'El correu o la contrasenya no són correctes.';
+      case 'auth/email-already-in-use': return 'Aquest correu ja té compte. Inicia sessió o restableix la contrasenya.';
+      case 'auth/weak-password': return 'Tria una contrasenya d’almenys sis caràcters.';
+      case 'auth/too-many-requests': return 'Massa intents. Torna-ho a provar més tard.';
+      default: return error.status ? error.message : 'No hi ha connexió amb el servei d’accés. Torna-ho a provar.';
+    }
+  }
+
+  async function request(body) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw Object.assign(new Error('Torna a iniciar sessió.'),{status:401});
+    const headers = {Authorization:'Bearer '+token};
+    if (body) headers['Content-Type'] = 'application/json';
+    const response = await fetch(apiOrigin+'/api',{method:body ? 'POST' : 'GET',headers,
+      body:body ? JSON.stringify(body) : undefined,cache:'no-store',credentials:'omit'});
+    const result = await response.json();
+    if (!response.ok) throw Object.assign(new Error(result.error),{status:response.status});
+    return result;
+  }
+
+  async function enter(user) {
+    form.hidden = Boolean(user);
+    resetPanel.hidden = Boolean(user);
+    actions.hidden = !user;
+    repair.hidden = !user || user.emailVerified;
+    logout.hidden = !user;
+    if (!user) {
+      show('');
+      return;
+    }
+    show('Comprovant l’accés…');
+    try {
+      const data = await request();
+      if (auth.currentUser?.uid !== user.uid || mounted) return;
+      mounted = true;
+      panel.hidden = true;
+      workspace.hidden = false;
+      mountApp(request,data);
+    } catch (error) {
+      document.querySelector('#resend-verification').hidden = user.emailVerified;
+      show(errorMessage(error));
+    }
+  }
+
+  async function withFeedback(operation) {
+    if (busy) return;
+    busy = true;
+    try { await operation(); }
+    catch (error) { show(errorMessage(error)); }
+    finally { busy = false; }
+  }
+
+  try {
+    const response = await fetch(apiOrigin+'/auth-config',{cache:'no-store',credentials:'omit'});
+    if (!response.ok) throw new Error('Firebase configuration unavailable');
+    // Keep the existing Firebase app key so sessions survive the rename.
+    auth = getAuth(initializeApp(await response.json(),'tracacomandes'));
+    auth.languageCode = 'ca';
+  } catch {
+    show('L’accés de l’equip no està disponible. Torna-ho a provar més tard.');
+    form.hidden = true;
+    resetPanel.hidden = true;
+    return;
+  }
+
+  const emailField = form.elements.email;
+  form.addEventListener('submit',event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      const email = emailField.value.trim();
+      const password = form.elements.password.value;
+      if (event.submitter?.value === 'register') {
+        const {user} = await createUserWithEmailAndPassword(auth,email,password);
+        await sendEmailVerification(user);
+        show('T’hem enviat un correu de verificació. Obre’l i torna aquí per continuar.');
+      } else {
+        await signInWithEmailAndPassword(auth,email,password);
+      }
+      form.reset();
+    });
+  });
+
+  function emailActionCode(value, mode) {
+    try {
+      const link = new URL(value.trim());
+      if (((link.origin === 'https://'+auth.app.options.authDomain && link.pathname === '/__/auth/action') ||
+           (link.origin === 'https://jninforner.github.io' && ['/NexaComandes/','/tracacomandes/'].includes(link.pathname))) && link.searchParams.get('mode') === mode) {
+        return link.searchParams.get('oobCode');
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  resetForm.addEventListener('submit',event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      const code = emailActionCode(resetForm.elements.link.value,'resetPassword');
+      if (!code) {
+        show('Enganxa l’enllaç complet del correu de restabliment de contrasenya de NexaComandes.');
+        return;
+      }
+      try {
+        const email = await verifyPasswordResetCode(auth,code);
+        await confirmPasswordReset(auth,code,resetForm.elements.password.value);
+        resetForm.reset();
+        resetForm.elements.link.closest('label').hidden = false;
+        resetPanel.open = false;
+        if (actionMode) {
+          actionMode = '';
+          if (auth.currentUser) await signOut(auth);
+          await enter(null);
+        }
+        emailField.value = email;
+        form.elements.password.value = '';
+        form.elements.password.focus();
+        show('Contrasenya desada. Ja pots entrar amb la nova.');
+      } catch (error) {
+        resetForm.elements.password.value = '';
+        if (['auth/invalid-action-code','auth/expired-action-code'].includes(error.code)) {
+          show('Aquest enllaç ha caducat o ja s’ha utilitzat. Demana’n un de nou amb «He oblidat la contrasenya».');
+        } else {
+          throw error;
+        }
+      }
+    });
+  });
+
+  document.querySelector('#password-reset').onclick = event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      if (!emailField.reportValidity()) return;
+      await sendPasswordResetEmail(auth,emailField.value.trim());
+      show('Si existeix un compte amb aquest correu, rebràs un enllaç per restablir la contrasenya.');
+    });
+  };
+
+  document.querySelector('#retry-login').onclick = () => withFeedback(async () => {
+    if (!auth.currentUser) return;
+    await reload(auth.currentUser);
+    if (!auth.currentUser) return;
+    await auth.currentUser.getIdToken(true);
+    await enter(auth.currentUser);
+  });
+
+  document.querySelector('#resend-verification').onclick = () => withFeedback(async () => {
+    if (!auth.currentUser) return;
+    await sendEmailVerification(auth.currentUser);
+    show('T’hem tornat a enviar el correu de verificació.');
+  });
+
+  repair.addEventListener('submit',event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      const user = auth.currentUser;
+      if (!user && actionMode !== 'verifyEmail') return;
+      const code = emailActionCode(repair.elements.link.value,'verifyEmail');
+      if (!code) {
+        show('Enganxa l’enllaç complet del correu de verificació de NexaComandes.');
+        return;
+      }
+      try {
+        const info = await checkActionCode(auth,code);
+        if (info.operation !== 'VERIFY_EMAIL' || (user && actionMode !== 'verifyEmail' && info.data.email?.toLowerCase() !== user.email?.toLowerCase())) {
+          show('Aquest enllaç correspon a un altre compte.');
+          return;
+        }
+        await applyActionCode(auth,code);
+        repair.reset();
+        actionMode = '';
+        if (user && info.data.email?.toLowerCase() === user.email?.toLowerCase()) {
+          await reload(user);
+          await user.getIdToken(true);
+          await enter(user);
+        } else {
+          if (user) await signOut(auth);
+          await enter(null);
+          emailField.value = info.data.email || '';
+          show('Correu verificat. Ja pots iniciar sessió.');
+        }
+      } catch (error) {
+        if (['auth/invalid-action-code','auth/expired-action-code'].includes(error.code)) {
+          show('L’enllaç ha caducat o ja s’ha utilitzat. Prem «Comprova l’accés» o demana un correu nou.');
+        } else {
+          throw error;
+        }
+      }
+    });
+  });
+
+  logout.onclick = () => withFeedback(async () => {
+    await signOut(auth);
+    location.reload();
+  });
+
+  if (actionMode) {
+    form.hidden = true;
+    resetPanel.hidden = actionMode !== 'resetPassword';
+    resetPanel.open = !resetPanel.hidden;
+    repair.hidden = actionMode !== 'verifyEmail';
+    const current = resetPanel.hidden ? repair : resetForm;
+    current.elements.link.value = emailAction.href;
+    current.elements.link.closest('label').hidden = true;
+    show(actionMode === 'resetPassword' ? 'Tria una contrasenya nova.' : 'Prem el botó per confirmar el correu.');
+  }
+
+  onAuthStateChanged(auth,user => {
+    if (actionMode) return;
+    if (mounted && !user) location.reload();
+    else if (!mounted) void enter(user);
+  });
+}
+
+startStaffApp(location.hostname === "jninforner.github.io" ? "https://comandes-cuina-mworkeza.shinyshrew16.chatgpt.site" : location.origin,mountApp);
+</script>
+</body>
+</html>
