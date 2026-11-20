@@ -51,7 +51,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </head>
 <body>
 <main>
-<header><div><h1>TraçaComandes</h1><span class="meta">Versió 1.1.1</span></div><div class="actions"><button id="logout" hidden>Surt</button><button id="theme" aria-label="Canvia el tema">◐</button></div></header>
+<header><div><h1>TraçaComandes</h1><span class="meta">Versió 1.1.2</span></div><div class="actions"><button id="logout" hidden>Surt</button><button id="theme" aria-label="Canvia el tema">◐</button></div></header>
 <section id="login-panel" class="card">
 <h2>Inicia sessió</h2>
 <p id="login-status" role="status">Carregant l’accés…</p>
@@ -65,6 +65,15 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <button value="register">Crea un compte</button>
 <button id="password-reset" type="button">He oblidat la contrasenya</button>
 </div></form>
+<details id="reset-panel" class="item" hidden>
+<summary>L’enllaç per canviar la contrasenya dona error?</summary>
+<form id="reset-link-form">
+<div class="grid">
+<label>Enllaç del correu de restabliment<input name="link" type="url" autocomplete="off" autocapitalize="none" required></label>
+<label>Contrasenya nova<input name="password" type="password" minlength="6" autocomplete="new-password" required></label>
+</div>
+<button class="primary">Desa la contrasenya nova</button>
+</form></details>
 <div class="actions" id="verify-actions" hidden>
 <button id="retry-login">Comprova l’accés</button>
 <button id="resend-verification">Torna a enviar el correu</button>
@@ -460,7 +469,7 @@ if (!initialData) notify('Carregant les dades…');
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  sendEmailVerification, sendPasswordResetEmail, signOut, reload, checkActionCode, applyActionCode
+  sendEmailVerification, sendPasswordResetEmail, signOut, reload, checkActionCode, applyActionCode, verifyPasswordResetCode, confirmPasswordReset
 } from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js';
 
 async function startStaffApp(apiOrigin, mountApp) {
@@ -469,6 +478,8 @@ async function startStaffApp(apiOrigin, mountApp) {
   const message = document.querySelector('#login-status');
   const actions = document.querySelector('#verify-actions');
   const repair = document.querySelector('#verify-link-form');
+  const resetPanel = document.querySelector('#reset-panel');
+  const resetForm = document.querySelector('#reset-link-form');
   const logout = document.querySelector('#logout');
   const workspace = document.querySelector('#workspace');
   let auth;
@@ -503,6 +514,7 @@ async function startStaffApp(apiOrigin, mountApp) {
 
   async function enter(user) {
     form.hidden = Boolean(user);
+    resetPanel.hidden = Boolean(user);
     actions.hidden = !user;
     repair.hidden = !user || user.emailVerified;
     logout.hidden = !user;
@@ -540,6 +552,7 @@ async function startStaffApp(apiOrigin, mountApp) {
   } catch {
     show('L’accés de l’equip no està disponible. Torna-ho a provar més tard.');
     form.hidden = true;
+    resetPanel.hidden = true;
     return;
   }
 
@@ -557,6 +570,47 @@ async function startStaffApp(apiOrigin, mountApp) {
         await signInWithEmailAndPassword(auth,email,password);
       }
       form.reset();
+    });
+  });
+
+  function emailActionCode(value, mode) {
+    try {
+      const link = new URL(value.trim());
+      if (link.origin === 'https://'+auth.app.options.authDomain &&
+          link.pathname === '/__/auth/action' && link.searchParams.get('mode') === mode) {
+        return link.searchParams.get('oobCode');
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  resetForm.addEventListener('submit',event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      const code = emailActionCode(resetForm.elements.link.value,'resetPassword');
+      if (!code) {
+        show('Enganxa l’enllaç complet del correu de restabliment de contrasenya de TraçaComandes.');
+        return;
+      }
+      try {
+        const email = await verifyPasswordResetCode(auth,code);
+        await confirmPasswordReset(auth,code,resetForm.elements.password.value);
+        resetForm.reset();
+        resetPanel.open = false;
+        emailField.value = email;
+        form.elements.password.value = '';
+        form.elements.password.focus();
+        show('Contrasenya desada. Ja pots entrar amb la nova.');
+      } catch (error) {
+        resetForm.elements.password.value = '';
+        if (['auth/invalid-action-code','auth/expired-action-code'].includes(error.code)) {
+          show('Aquest enllaç ha caducat o ja s’ha utilitzat. Demana’n un de nou amb «He oblidat la contrasenya».');
+        } else {
+          throw error;
+        }
+      }
     });
   });
 
@@ -585,13 +639,9 @@ async function startStaffApp(apiOrigin, mountApp) {
     void withFeedback(async () => {
       const user = auth.currentUser;
       if (!user) return;
-      let link;
-      try { link = new URL(repair.elements.link.value.trim()); }
-      catch { show('Enganxa l’enllaç complet del correu de verificació.'); return; }
-      const code = link.searchParams.get('oobCode');
-      if (link.origin !== 'https://'+auth.app.options.authDomain ||
-          link.pathname !== '/__/auth/action' || link.searchParams.get('mode') !== 'verifyEmail' || !code) {
-        show('Enganxa l’enllaç de verificació que t’ha enviat TraçaComandes.');
+      const code = emailActionCode(repair.elements.link.value,'verifyEmail');
+      if (!code) {
+        show('Enganxa l’enllaç complet del correu de verificació de TraçaComandes.');
         return;
       }
       try {
