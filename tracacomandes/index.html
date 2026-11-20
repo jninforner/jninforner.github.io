@@ -1,8 +1,591 @@
 <!doctype html>
 <html lang="ca">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TraçaComandes</title>
-<meta http-equiv="refresh" content="0; url=https://comandes-cuina-mworkeza.shinyshrew16.chatgpt.site/">
-<p><a href="https://comandes-cuina-mworkeza.shinyshrew16.chatgpt.site/">Obre TraçaComandes</a></p>
+<link rel="icon" type="image/png" href="./icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./icon.png">
+<style>:root{color-scheme:light;--bg:#f7f8fd;--tx:#28377e;--mu:#566598;--ln:#303f91;--surface:#fff;--soft:#f0f2fc;--border:#d4daf1;--field:#b6bfdf;--on:#fff;--red:#b42318;--green:#17734a}
+:root[data-theme=dark]{color-scheme:dark;--bg:#10152c;--tx:#e5e9ff;--mu:#adb8e5;--ln:#a1afff;--surface:#1b2447;--soft:#232f59;--border:#425080;--field:#6371a0;--on:#10152c;--red:#ff9992;--green:#84dbab}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:760px;margin:auto;padding:20px 16px 36px}
+header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:18px}
+h1{font-size:28px;letter-spacing:-.035em;margin:0}
+h2{font-size:21px;margin:0 0 14px}
+h3{font-size:17px;margin:0 0 8px}
+p{margin:8px 0}
+nav,.actions{display:flex;gap:8px;flex-wrap:wrap}
+nav{margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:0 3px 14px rgba(40,55,126,.055);padding:20px;margin-bottom:16px}
+label{display:grid;gap:4px;font-size:14px;color:var(--mu)}
+input,select,textarea{width:100%;min-height:46px;padding:8px 12px;border:1px solid var(--field);border-radius:10px;background:var(--surface);color:var(--tx);font:inherit}
+textarea{display:block;resize:vertical;margin:10px 0}
+button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 15px;border:1px solid var(--ln);border-radius:10px;background:var(--surface);color:var(--tx);font:600 15px/1.3 inherit;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none}
+button:hover,.button:hover{background:var(--soft)}
+.primary,[aria-current=page]{background:var(--ln);color:var(--on)}
+.primary:hover,[aria-current=page]:hover{background:var(--ln);filter:brightness(1.13)}
+:focus-visible{outline:3px solid #788cf0;outline-offset:2px}
+button:disabled{opacity:.55;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.item{border-top:1px solid var(--border);padding:12px 0}
+.item:last-child{padding-bottom:0}
+.meta{color:var(--mu);font-size:14px}
+.error,.remove{color:var(--red)}
+#status:empty{display:none}
+#status{margin-bottom:12px}
+.whatsapp{color:var(--green);border-color:var(--green)}
+@media(max-width:430px){main{padding:14px 12px 28px}.card{padding:15px}h1{font-size:24px}nav button{padding:8px 11px}}
+.order-lookup{margin-bottom:12px}
+.order-matches{margin-top:6px;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:10px}
+.order-matches button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;border:0;border-radius:0;text-align:left}
+.order-matches button+button{border-top:1px solid var(--border)}
+.order-matches button:focus-visible{outline-offset:-3px}
+#order-match-status:empty{display:none}
+#line{margin-top:12px}
+[hidden]{display:none !important}
+</style>
+<link rel="manifest" href="./manifest.webmanifest">
+</head>
+<body>
+<main>
+<header><div><h1>TraçaComandes</h1><span class="meta">Versió 1.1.0</span></div><div class="actions"><button id="logout" hidden>Surt</button><button id="theme" aria-label="Canvia el tema">◐</button></div></header>
+<section id="login-panel" class="card">
+<h2>Inicia sessió</h2>
+<p id="login-status" role="status">Carregant l’accés…</p>
+<form id="login-form">
+<div class="grid">
+<label>Correu<input name="email" type="email" autocomplete="username" autocapitalize="none" required></label>
+<label>Contrasenya<input name="password" type="password" autocomplete="current-password" required></label>
+</div>
+<div class="actions">
+<button class="primary" value="login">Entra</button>
+<button value="register">Crea un compte</button>
+<button id="password-reset" type="button">He oblidat la contrasenya</button>
+</div></form>
+<div class="actions" id="verify-actions" hidden>
+<button id="retry-login">Comprova l’accés</button>
+<button id="resend-verification">Torna a enviar el correu</button>
+</div></section>
+<div id="workspace" hidden>
+<nav aria-label="Seccions" id="tabs"></nav>
+<p id="status" role="status"></p>
+<section id="content" aria-label="Contingut"></section>
+</div>
+</main>
+<script type="module">
+function mountApp(request, initialData) {
+const pendingUnit = 'pending-supplier-unit';
+const sections = {order:'Nova comanda', articles:'Articles', suppliers:'Proveïdors', categories:'Categories', units:'Unitats', history:'Historial'};
+const content = document.querySelector('#content');
+const status = document.querySelector('#status');
+const tabs = document.querySelector('#tabs');
+const theme = document.querySelector('#theme');
+const dateFormat = new Intl.DateTimeFormat('ca-ES',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Madrid'});
+const quantityFormat = new Intl.NumberFormat('ca-ES',{maximumSignificantDigits:15});
+let data;
+let section = 'order';
+let edit = '';
+let categoryFilter = '';
+let articleSearch = '';
+let openOrder = '';
+let orderArticle = '';
+let orderSearch = '';
+let showMatches = true;
+let creatingArticle = false;
+const purchaseUnits = () => data.units.filter(unit => unit.id !== pendingUnit);
+const searchKey = value => value.trim().normalize('NFD').replace(/\p{Diacritic}/gu,'').toLocaleLowerCase('ca');
+let busy = false;
+
+function setTheme(value) {
+  document.documentElement.dataset.theme = value;
+  theme.setAttribute('aria-pressed', value === 'dark');
+}
+setTheme(localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+theme.onclick = () => {
+  const value = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme',value);
+  setTheme(value);
+};
+
+function escape(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+const byId = (type,id) => data[type].find(item => item.id === id);
+const options = (items, selected, label) => '<option value="">'+label+'</option>' + items.map(item =>
+  '<option value="'+escape(item.id)+'" '+(item.id === selected ? 'selected' : '')+'>'+escape(item.name)+'</option>').join('');
+const empty = message => '<p class="meta">'+message+'</p>';
+
+async function api(body) {
+  if (request) return request(body);
+  const response = await fetch('/api', body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {});
+  const result = await response.json();
+  if (!response.ok) throw Object.assign(new Error(result.error),{status:response.status});
+  return result;
+}
+
+function notify(message, error = false) {
+  status.textContent = message;
+  status.classList.toggle('error',error);
+}
+
+async function save(payload, done, button, success = () => 'Canvis desats.') {
+  if (busy) return;
+  busy = true;
+  if (button) button.disabled = true;
+  let saved = false;
+  try {
+    const result = await api(payload);
+    saved = true;
+    done?.(result);
+    data = await api();
+    notify(success(result));
+    render();
+  } catch (error) {
+    if (error.status === 409 && ['draft','order'].includes(payload.action)) {
+      try {
+        data = await api();
+        render();
+      } catch {
+        // Keep the previous view available if the refresh fails.
+      }
+    }
+    notify(saved ? 'El canvi s’ha desat. Recarrega la pàgina per veure’l.' : error.message,true);
+  } finally {
+    busy = false;
+    if (button) button.disabled = false;
+  }
+}
+
+function catalog() {
+  const current = byId(section,edit);
+  const isSupplier = section === 'suppliers';
+  const names = {suppliers:'proveïdor',articles:'article',units:'unitat',categories:'categoria'};
+  const label = names[section];
+  const title = current ? 'Edita ' + current.name : {suppliers:'Nou proveïdor',articles:'Nou article',units:'Nova unitat',categories:'Nova categoria'}[section];
+  const isArticle = section === 'articles';
+  const rows = data[section].filter(item => item.id !== pendingUnit && (!isArticle || ((!categoryFilter || (item.category_id || '-') === categoryFilter) &&
+    item.name.toLocaleLowerCase('ca').includes(articleSearch.toLocaleLowerCase('ca')))));
+  const filters = isArticle ? '<div id="article-filters" class="grid"><label>Cerca per nom<input id="article-search" type="search" value="'+escape(articleSearch)+'"></label><label>Categoria<select id="category-filter">'+options(data.categories,categoryFilter,'Totes les categories')+'<option value="-" '+(categoryFilter === '-' ? 'selected' : '')+'>Sense categoria</option></select></label></div>' : '';
+  return '<article class="card"><h2>'+escape(title)+'</h2><form id="catalog"><div class="grid">'+
+    '<label>Nom<input name="name" required maxlength="120" value="'+escape(current?.name)+'"></label>'+
+    (isSupplier ? '<label>WhatsApp amb prefix internacional<input name="phone" type="tel" placeholder="+34 600 000 000" value="'+(current?.phone ? '+'+escape(current.phone) : '')+'"></label>' : '')+
+    (isArticle ? '<label>Categoria<select name="category">'+options(data.categories,current?.category_id,'Sense categoria')+'</select></label><label>Unitat de compra<select name="unit">'+options(data.units.filter(unit => unit.id !== pendingUnit),current?.unit_id,'Sense unitat')+'</select></label>' : '')+
+    '</div><div class="actions"><button class="primary">Desa</button>'+(current ? '<button type="button" data-cancel>Cancel·la</button>' : '')+'</div></form></article>'+
+    (section === 'articles' && current ? offerEditor(current) : '')+
+    (isArticle ? '<article class="card"><details><summary>Importa el catàleg</summary><form id="import-catalog"><p class="meta">Fitxer JSON amb els articles, les categories, les unitats i els proveïdors.</p><label>Fitxer de catàleg<input name="catalog" type="file" accept=".json,application/json"></label><label>O enganxa el contingut JSON<textarea name="catalogText" rows="3"></textarea></label><button class="primary">Importa els articles</button></form></details></article>' : '')+
+    '<article class="card"><h2>'+sections[section]+'</h2>'+filters+'<div id="catalog-rows">'+
+    (rows.map(item => {
+      const linked = data.offers.filter(offer => offer.article_id === item.id);
+      const detail = isSupplier ? (item.phone ? '+'+item.phone : 'WhatsApp pendent') : section === 'articles' ? ([byId('categories',item.category_id)?.name,byId('units',item.unit_id)?.name,linked.map(offer => byId('suppliers',offer.supplier_id)?.name).filter(Boolean).join(' · ') || 'Sense proveïdors'].filter(Boolean).join(' · ')) : '';
+      return '<div class="item row"><div><strong>'+escape(item.name)+'</strong>'+(detail ? '<div class="meta">'+escape(detail)+'</div>' : '')+'</div><button data-edit="'+escape(item.id)+'">Edita</button></div>';
+    }).join('') || empty('Cap '+label+' per mostrar.'))+'</div></article>';
+}
+
+function offerEditor(article) {
+  const linked = data.offers.filter(offer => offer.article_id === article.id);
+  return '<article class="card"><h2>Proveïdors de '+escape(article.name)+'</h2>'+
+    (data.suppliers.length ? '<form id="offer"><div class="grid"><label>Proveïdor<select required name="supplier">'+options(data.suppliers,'','Tria un proveïdor')+'</select></label>'+
+      '<label>Unitat de compra<select required name="unit">'+options(data.units.filter(unit => unit.id !== pendingUnit),article.unit_id,'Tria una unitat')+'</select></label></div><button class="primary">Desa l’opció de compra</button></form>' :
+      '<p>Crea un proveïdor per associar-lo a aquest article.</p><button data-tab="suppliers">Ves a Proveïdors</button>')+
+    linked.map(offer => '<div class="row item"><span>'+escape(byId('suppliers',offer.supplier_id)?.name)+' · '+escape(byId('units',offer.unit_id)?.name)+'</span><button class="remove" data-unlink="'+escape(offer.supplier_id)+'">Desvincula</button></div>').join('')+'</article>';
+}
+
+function orderMatches() {
+  const query = searchKey(orderSearch);
+  return data.articles.filter(article => searchKey(article.name).includes(query));
+}
+
+function order() {
+  const draft = data.draft.lines;
+  const quickArticle = creatingArticle ? '<form id="quick-article" class="item"><h3>Nou article</h3><div class="grid">'+
+    '<label>Nom<input name="name" required maxlength="120" value="'+escape(orderSearch.trim())+'"></label>'+
+    '<label>Categoria<select name="category">'+options(data.categories,'','Sense categoria')+'</select></label>'+
+    '<label>Proveïdor<select name="supplier" required>'+options(data.suppliers,'','Tria un proveïdor')+'</select></label>'+
+    '<label>Unitat de compra<select name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label></div>'+
+    '<div class="actions">'+(data.suppliers.length ? '<button class="primary">Crea l’article</button>' : '<button type="button" data-tab="suppliers">Dona d’alta un proveïdor</button>')+
+    '<button id="cancel-quick" type="button">Cancel·la</button></div></form>' : '';
+  return '<article class="card"><h2>Nova comanda</h2>'+
+    '<div class="order-lookup"><label>Cerca un article<input id="order-search" type="search" aria-controls="order-matches" autocomplete="off" value="'+escape(orderSearch)+'"></label>'+
+    '<div id="order-matches" class="order-matches" role="group" aria-label="Articles trobats" hidden></div>'+
+    '<p id="order-match-status" class="meta" role="status"></p></div>'+
+    '<div class="actions"><button id="quick-toggle" aria-expanded="'+creatingArticle+'">Nou article</button></div>'+quickArticle+
+    '<form id="line"><input type="hidden" id="article" name="article"><div class="grid">'+
+    '<label>Proveïdor<select id="supplier" required name="supplier"></select></label>'+
+    '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" required></label>'+
+    '<label>Unitat<select id="line-unit" name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label>'+
+    '</div><p id="order-supplier-status" class="meta"></p><button id="add-line">Afegeix la línia</button></form>'+
+    '</article><article class="card"><h2>Línies de la comanda</h2>'+
+    (draft.map((line,index) => '<div class="row item"><div><strong>'+escape(byId('articles',line.article)?.name)+'</strong> · '+escape(quantityFormat.format(line.quantity))+
+      '<div class="meta">'+escape(byId('suppliers',line.supplier)?.name)+'</div></div><label>Unitat<select data-line-unit="'+index+'" aria-label="Unitat de la línia '+(index+1)+'">'+
+      options(purchaseUnits(),line.unit,'Tria una unitat')+'</select></label><button class="remove" data-remove="'+index+'">Treu</button></div>').join('') || empty('Encara no hi ha cap línia.'))+
+    (draft.length ? '<div class="actions item"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+'</article>';
+}
+
+function orderOptions() {
+  const matches = orderSearch.trim() && showMatches ? orderMatches() : [];
+  const results = document.querySelector('#order-matches');
+  results.hidden = !matches.length;
+  results.innerHTML = matches.map(article => {
+    const category = byId('categories',article.category_id)?.name;
+    return '<button type="button" data-pick-article="'+escape(article.id)+'">'+escape(article.name)+
+      (category ? '<span class="meta">'+escape(category)+'</span>' : '')+'</button>';
+  }).join('');
+  const selected = byId('articles',orderArticle);
+  document.querySelector('#article').value = selected?.id || '';
+  document.querySelector('#order-match-status').textContent = selected ? 'Article triat: '+selected.name :
+    orderSearch.trim() && !matches.length ? 'Cap article coincideix amb la cerca. Pots crear-lo amb «Nou article».' : '';
+  supplierOptions();
+}
+
+function pickOrderArticle(id) {
+  const article = byId('articles',id);
+  if (!article) return;
+  orderArticle = id;
+  orderSearch = article.name;
+  showMatches = false;
+  document.querySelector('#order-search').value = orderSearch;
+  orderOptions();
+  const supplier = document.querySelector('#supplier');
+  (supplier.disabled ? document.querySelector('#order-search') : supplier).focus();
+}
+
+function supplierOptions() {
+  const select = document.querySelector('#supplier');
+  const offers = data.offers.filter(offer => offer.article_id === orderArticle);
+  select.innerHTML = options(offers.map(offer => byId('suppliers',offer.supplier_id)).filter(Boolean),
+    offers.length === 1 ? offers[0].supplier_id : '', 'Tria un proveïdor');
+  select.disabled = !offers.length;
+  document.querySelector('#add-line').disabled = !offers.length;
+  document.querySelector('#order-supplier-status').textContent = orderArticle && !offers.length ? 'Aquest article encara no té cap proveïdor assignat.' : '';
+  defaultUnit();
+}
+
+function defaultUnit() {
+  const supplier = document.querySelector('#supplier').value;
+  const offer = data.offers.find(item => item.article_id === orderArticle && item.supplier_id === supplier);
+  document.querySelector('#line-unit').value = offer && offer.unit_id !== pendingUnit ? offer.unit_id : byId('articles',orderArticle)?.unit_id || '';
+}
+
+function saveDraft(lines, button) {
+  return save({action:'draft',lines,revision:data.draft.revision},null,button,()=>'Esborrany desat.');
+}
+
+function history() {
+  const orders = Map.groupBy(data.lines, line => line.order_id);
+  return '<article class="card"><h2>Historial de comandes</h2>'+
+    ([...orders].map(([id, lines]) => {
+      const groups = Map.groupBy(lines,line => line.supplier_id);
+      return '<div class="item"><div class="row"><div><strong>'+escape(dateFormat.format(new Date(lines[0].created_at)))+'</strong><div class="meta">'+
+        lines.length+' '+(lines.length === 1 ? 'línia' : 'línies')+' · '+groups.size+' '+(groups.size === 1 ? 'proveïdor' : 'proveïdors')+
+        '</div></div><button data-order="'+escape(id)+'" aria-expanded="'+(id === openOrder)+'">'+(id === openOrder ? 'Amaga' : 'Mostra els missatges')+'</button></div>'+
+        (id === openOrder ? [...groups.values()].map(messageCard).join('') : '')+'</div>';
+    }).join('') || empty('Encara no hi ha comandes desades.'))+'</article>';
+}
+
+function messageCard(lines) {
+  const supplier = lines[0];
+  const message = 'Bon dia! Us voldríem fer aquesta comanda:\n\n'+lines.map(line => '• '+quantityFormat.format(line.quantity)+' '+line.unit+' de '+line.article).join('\n')+'\n\nGràcies!';
+  return '<section class="item"><h3>'+escape(supplier.supplier)+'</h3><label>Missatge<textarea readonly rows="'+Math.min(13,lines.length+4)+'">'+escape(message)+'</textarea></label><div class="actions">'+
+    (supplier.phone ? '<a class="button whatsapp" target="_blank" rel="noopener noreferrer" href="https://wa.me/'+escape(supplier.phone)+'?text='+escape(encodeURIComponent(message))+'">Obre WhatsApp</a>' : '<span class="meta">WhatsApp pendent</span>')+
+    '<button data-copy>Copia el missatge</button></div></section>';
+}
+
+function staff() {
+  return '<article class="card"><h2>Accés de l’equip</h2><form id="staff-access"><div class="grid">'+
+    '<label>Correu del treballador<input type="email" name="email" autocomplete="off" required></label></div>'+
+    '<button class="primary">Autoritza</button></form>'+
+    (data.staff.map(person => '<div class="row item"><span>'+escape(person.email)+'</span><button data-remove-staff="'+escape(person.email)+'">Retira l’accés</button></div>').join('') ||
+      empty('Encara no hi ha treballadors autoritzats.'))+'</article>';
+}
+
+function render() {
+  const tabsToShow = data.staff ? {...sections,staff:'Equip'} : sections;
+  tabs.innerHTML = Object.entries(tabsToShow).map(([key,label]) => '<button data-tab="'+key+'" '+(section === key ? 'aria-current="page"' : '')+'>'+label+'</button>').join('');
+  content.innerHTML = section === 'order' ? order() : section === 'history' ? history() : section === 'staff' ? staff() : catalog();
+  if (section === 'order') orderOptions();
+}
+
+document.addEventListener('click',async event => {
+  const button = event.target.closest('button');
+  if (!button || button.id === 'theme' || !data || busy) return;
+  const target = button.dataset;
+  if (target.tab) {
+    section = target.tab;
+    edit = '';
+    notify('');
+    render();
+  } else if (target.edit || Object.hasOwn(target,'cancel')) {
+    edit = target.edit || '';
+    render();
+    document.querySelector('#catalog input').focus();
+    document.querySelector('#catalog').scrollIntoView({block:'nearest'});
+  } else if (target.removeStaff) {
+    await save({action:'staffRemove',email:target.removeStaff},null,button);
+  } else if (target.pickArticle) {
+    pickOrderArticle(target.pickArticle);
+  } else if (button.id === 'quick-toggle' || button.id === 'cancel-quick') {
+    creatingArticle = !creatingArticle;
+    render();
+    document.querySelector(creatingArticle ? '#quick-article input' : '#order-search').focus();
+  } else if (target.unlink) {
+    await save({action:'unlink',article:edit,supplier:target.unlink},null,button);
+  } else if (Object.hasOwn(target,'remove')) {
+    await saveDraft(data.draft.lines.filter((_,index) => index !== Number(target.remove)),button);
+  } else if (button.id === 'generate') {
+    await save({action:'order',revision:data.draft.revision}, result => {
+      section = 'history';
+      openOrder = result.id;
+    },button);
+  } else if (target.order) {
+    openOrder = openOrder === target.order ? '' : target.order;
+    render();
+    [...content.querySelectorAll('[data-order]')].find(item => item.dataset.order === target.order)?.focus();
+  } else if (Object.hasOwn(target,'copy')) {
+    const field = button.closest('section').querySelector('textarea');
+    try {
+      await navigator.clipboard.writeText(field.value);
+      notify('Missatge copiat.');
+    } catch {
+      field.select();
+      notify('Seleccionat. Pots copiar el missatge manualment.');
+    }
+  }
+});
+
+document.addEventListener('change', async event => {
+  if (Object.hasOwn(event.target.dataset,'lineUnit')) {
+    const index = Number(event.target.dataset.lineUnit);
+    const unit = event.target.value;
+    if (!unit || busy) {
+      event.target.value = data.draft.lines[index].unit;
+      return;
+    }
+    await saveDraft(data.draft.lines.map((line,position) => position === index ? {...line,unit} : line));
+    if (event.target.isConnected) event.target.value = data.draft.lines[index].unit;
+    return;
+  }
+  if (event.target.id === 'supplier') defaultUnit();
+  if (event.target.id === 'category-filter') {
+    categoryFilter = event.target.value;
+    refreshCatalogRows();
+  }
+  if (event.target.matches('#offer select[name=supplier]')) {
+    const offer = data.offers.find(item => item.article_id === edit && item.supplier_id === event.target.value);
+    document.querySelector('#offer select[name=unit]').value = offer && offer.unit_id !== pendingUnit ? offer.unit_id : byId('articles',edit)?.unit_id || '';
+  }
+});
+
+function refreshCatalogRows() {
+  const template = document.createElement('template');
+  template.innerHTML = catalog();
+  document.querySelector('#catalog-rows').replaceChildren(...template.content.querySelector('#catalog-rows').childNodes);
+}
+
+document.addEventListener('input', event => {
+  if (event.target.id === 'order-search') {
+    orderSearch = event.target.value;
+    orderArticle = '';
+    showMatches = true;
+    orderOptions();
+  }
+  if (event.target.id !== 'article-search') return;
+  articleSearch = event.target.value;
+  refreshCatalogRows();
+});
+
+document.addEventListener('keydown', event => {
+  if (event.target.id !== 'order-search' || !['ArrowDown','Enter'].includes(event.key)) return;
+  const first = document.querySelector('#order-matches button');
+  if (!first) return;
+  event.preventDefault();
+  if (event.key === 'Enter') pickOrderArticle(first.dataset.pickArticle);
+  else first.focus();
+});
+
+document.addEventListener('submit',async event => {
+  const form = event.target;
+  if (!form.closest('#workspace')) return;
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(form));
+  if (form.id === 'staff-access') {
+    await save({action:'staffAdd',email:values.email},null,event.submitter);
+  } else if (form.id === 'import-catalog') {
+    try {
+      const articles = JSON.parse(values.catalogText.trim() || await values.catalog.text());
+      await save({action:'importCatalog',articles},null,event.submitter, result => result.links || result.suppliers ? result.imported+' articles nous, '+result.suppliers+' proveïdors nous i '+result.links+' vincles nous.' : result.imported+' articles importats.');
+    } catch {
+      notify('El fitxer de catàleg ha de ser un JSON vàlid.',true);
+    }
+  } else if (form.id === 'catalog') {
+    await save({...values,action:section,id:edit},result => {
+      edit = section === 'articles' ? result.id : '';
+    },event.submitter);
+  } else if (form.id === 'offer') {
+    await save({...values,action:'offer',article:edit},null,event.submitter);
+  } else if (form.id === 'quick-article') {
+    await save({...values,action:'quickArticle'},result => {
+      orderArticle = result.id;
+      orderSearch = values.name.trim();
+      showMatches = false;
+      creatingArticle = false;
+    },event.submitter,()=>'Article creat. Ja el pots afegir a la comanda.');
+  } else if (form.id === 'line') {
+    const draft = data.draft.lines;
+    const offer = data.offers.find(item => item.article_id === values.article && item.supplier_id === values.supplier);
+    const quantity = Number(values.quantity);
+    if (!offer || !values.unit || !Number.isFinite(quantity) || quantity <= 0 || draft.length >= 100) {
+      notify('Tria un article, un proveïdor i una unitat, i indica una quantitat positiva. La comanda admet fins a 100 línies.',true);
+      return;
+    }
+    await saveDraft([...draft,{...values,quantity}],event.submitter);
+  }
+});
+
+if (!initialData) notify('Carregant les dades…');
+(initialData ? Promise.resolve(initialData) : api()).then(result => {
+  data = result;
+  notify('');
+  render();
+}).catch(error => notify('No s’han pogut carregar les dades. '+error.message,true));
+
+}
+
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendEmailVerification, sendPasswordResetEmail, signOut, reload
+} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js';
+
+async function startStaffApp(apiOrigin, mountApp) {
+  const panel = document.querySelector('#login-panel');
+  const form = document.querySelector('#login-form');
+  const message = document.querySelector('#login-status');
+  const actions = document.querySelector('#verify-actions');
+  const logout = document.querySelector('#logout');
+  const workspace = document.querySelector('#workspace');
+  let auth;
+  let mounted = false;
+  let busy = false;
+
+  function show(text) {
+    message.textContent = text;
+  }
+
+  function errorMessage(error) {
+    switch (error.code) {
+      case 'auth/invalid-credential': return 'El correu o la contrasenya no són correctes.';
+      case 'auth/email-already-in-use': return 'Aquest correu ja té compte. Inicia sessió o restableix la contrasenya.';
+      case 'auth/weak-password': return 'Tria una contrasenya d’almenys sis caràcters.';
+      case 'auth/too-many-requests': return 'Massa intents. Torna-ho a provar més tard.';
+      default: return error.status ? error.message : 'No hi ha connexió amb el servei d’accés. Torna-ho a provar.';
+    }
+  }
+
+  async function request(body) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw Object.assign(new Error('Torna a iniciar sessió.'),{status:401});
+    const headers = {Authorization:'Bearer '+token};
+    if (body) headers['Content-Type'] = 'application/json';
+    const response = await fetch(apiOrigin+'/api',{method:body ? 'POST' : 'GET',headers,
+      body:body ? JSON.stringify(body) : undefined,cache:'no-store',credentials:'omit'});
+    const result = await response.json();
+    if (!response.ok) throw Object.assign(new Error(result.error),{status:response.status});
+    return result;
+  }
+
+  async function enter(user) {
+    form.hidden = Boolean(user);
+    actions.hidden = !user;
+    logout.hidden = !user;
+    if (!user) {
+      show('');
+      return;
+    }
+    show('Comprovant l’accés…');
+    try {
+      const data = await request();
+      if (auth.currentUser?.uid !== user.uid || mounted) return;
+      mounted = true;
+      panel.hidden = true;
+      workspace.hidden = false;
+      mountApp(request,data);
+    } catch (error) {
+      document.querySelector('#resend-verification').hidden = user.emailVerified;
+      show(errorMessage(error));
+    }
+  }
+
+  async function withFeedback(operation) {
+    if (busy) return;
+    busy = true;
+    try { await operation(); }
+    catch (error) { show(errorMessage(error)); }
+    finally { busy = false; }
+  }
+
+  try {
+    const response = await fetch(apiOrigin+'/auth-config',{cache:'no-store',credentials:'omit'});
+    if (!response.ok) throw new Error('Firebase configuration unavailable');
+    auth = getAuth(initializeApp(await response.json(),'tracacomandes'));
+    auth.languageCode = 'ca';
+  } catch {
+    show('L’accés de l’equip no està disponible. Torna-ho a provar més tard.');
+    form.hidden = true;
+    return;
+  }
+
+  const emailField = form.elements.email;
+  form.addEventListener('submit',event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      const email = emailField.value.trim();
+      const password = form.elements.password.value;
+      if (event.submitter?.value === 'register') {
+        const {user} = await createUserWithEmailAndPassword(auth,email,password);
+        await sendEmailVerification(user);
+        show('T’hem enviat un correu de verificació. Obre’l i torna aquí per continuar.');
+      } else {
+        await signInWithEmailAndPassword(auth,email,password);
+      }
+      form.reset();
+    });
+  });
+
+  document.querySelector('#password-reset').onclick = () => withFeedback(async () => {
+    if (!emailField.reportValidity()) return;
+    await sendPasswordResetEmail(auth,emailField.value.trim());
+    show('Si existeix un compte amb aquest correu, rebràs un enllaç per restablir la contrasenya.');
+  });
+
+  document.querySelector('#retry-login').onclick = () => withFeedback(async () => {
+    if (!auth.currentUser) return;
+    await reload(auth.currentUser);
+    if (!auth.currentUser) return;
+    await auth.currentUser.getIdToken(true);
+    await enter(auth.currentUser);
+  });
+
+  document.querySelector('#resend-verification').onclick = () => withFeedback(async () => {
+    if (!auth.currentUser) return;
+    await sendEmailVerification(auth.currentUser);
+    show('T’hem tornat a enviar el correu de verificació.');
+  });
+
+  logout.onclick = () => withFeedback(async () => {
+    await signOut(auth);
+    location.reload();
+  });
+
+  onAuthStateChanged(auth,user => {
+    if (mounted && !user) location.reload();
+    else if (!mounted) void enter(user);
+  });
+}
+
+startStaffApp(location.hostname === "jninforner.github.io" ? "https://comandes-cuina-mworkeza.shinyshrew16.chatgpt.site" : location.origin,mountApp);
+</script>
+</body>
 </html>
