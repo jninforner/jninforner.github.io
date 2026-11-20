@@ -21,7 +21,7 @@ nav,.actions{display:flex;gap:8px;flex-wrap:wrap}
 nav{margin-bottom:16px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:0 3px 14px rgba(40,55,126,.055);padding:20px;margin-bottom:16px}
 label{display:grid;gap:4px;font-size:14px;color:var(--mu)}
-input,select,textarea{width:100%;min-height:46px;padding:8px 12px;border:1px solid var(--field);border-radius:10px;background:var(--surface);color:var(--tx);font:inherit}
+input,select,textarea{width:100%;min-height:46px;padding:8px 12px;border:1px solid var(--field);border-radius:10px;background:var(--surface);color:var(--tx);font:inherit;font-size:16px}
 textarea{display:block;resize:vertical;margin:10px 0}
 button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 15px;border:1px solid var(--ln);border-radius:10px;background:var(--surface);color:var(--tx);font:600 15px/1.3 inherit;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none}
 button:hover,.button:hover{background:var(--soft)}
@@ -103,8 +103,10 @@ img,video,canvas{max-width:100%;height:auto}
 .remember-contact input{width:18px;min-height:18px;flex:none}
 @media(max-width:480px){
   html{-webkit-text-size-adjust:100%}
-  .topbar{flex-wrap:wrap}
-  .top-actions{margin-inline-start:auto}
+  .topbar{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+  .top-actions{flex-wrap:wrap}
+  #menu-panel{left:0;right:auto;max-width:calc(100vw - 32px)}
+  button,.button{touch-action:manipulation}
   #line .grid,#catalog-line .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   #line .grid>label:first-of-type,#catalog-line .grid>label:first-of-type{grid-column:1/-1}
 }
@@ -114,7 +116,7 @@ img,video,canvas{max-width:100%;height:auto}
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.5.0<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.5.1<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -343,6 +345,20 @@ function vCardContact(text) {
     tel:entries.filter(line => /^(?:[\w-]+\.)?TEL(?:;[^:]*)?:/i.test(line)).map(line =>
       line.slice(line.indexOf(':')+1).replace(/^tel:/i,'').trim())
   };
+}
+
+function combineDraftLines(lines) {
+  const combined = new Map();
+  for (const line of lines) {
+    const key = JSON.stringify([line.article,line.supplier,line.unit]);
+    const previous = combined.get(key);
+    if (previous) {
+      previous.quantity = Number((previous.quantity + line.quantity).toPrecision(15));
+    } else {
+      combined.set(key,{...line});
+    }
+  }
+  return [...combined.values()];
 }
 
 function mountApp(request, initialData) {
@@ -1036,16 +1052,21 @@ document.addEventListener('submit',async event => {
     const draft = data.draft.lines;
     const offer = data.offers.find(item => item.article_id === values.article && item.supplier_id === values.supplier);
     const quantity = Number(values.quantity);
-    if (!offer || !values.unit || !Number.isFinite(quantity) || quantity <= 0 || draft.length >= 100) {
-      notify('Tria un article, un proveïdor i una unitat, i indica una quantitat positiva. La comanda admet fins a 100 línies.',true);
+    if (!offer || !values.unit || !Number.isFinite(quantity) || quantity <= 0) {
+      notify('Tria un article, un proveïdor i una unitat, i indica una quantitat positiva.',true);
+      return;
+    }
+    const lines = combineDraftLines([...draft,{...values,quantity}]);
+    if (lines.length > 100 || lines.some(line => !Number.isFinite(line.quantity))) {
+      notify('Revisa el total de la quantitat. La comanda admet fins a 100 línies.',true);
       return;
     }
     if (form.id === 'catalog-line') {
-      await save({action:'draft',lines:[...draft,{...values,quantity}],revision:data.draft.revision},() => {
+      await save({action:'draft',lines,revision:data.draft.revision},() => {
         addingArticle = '';
       },event.submitter,()=>'Article afegit a la comanda.');
     } else {
-      await saveDraft([...draft,{...values,quantity}],event.submitter);
+      await saveDraft(lines,event.submitter);
     }
   }
 });
