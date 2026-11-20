@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
 <title>TraçaComandes</title>
 <link rel="icon" type="image/png" href="./icon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="./icon.png">
@@ -51,7 +52,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </head>
 <body>
 <main>
-<header><div><h1>TraçaComandes</h1><span class="meta">Versió 1.1.2</span></div><div class="actions"><button id="logout" hidden>Surt</button><button id="theme" aria-label="Canvia el tema">◐</button></div></header>
+<header><div><h1>TraçaComandes</h1><span class="meta">Versió 1.1.3</span></div><div class="actions"><button id="logout" hidden>Surt</button><button id="theme" aria-label="Canvia el tema">◐</button></div></header>
 <section id="login-panel" class="card">
 <h2>Inicia sessió</h2>
 <p id="login-status" role="status">Carregant l’accés…</p>
@@ -485,6 +486,10 @@ async function startStaffApp(apiOrigin, mountApp) {
   let auth;
   let mounted = false;
   let busy = false;
+  const emailAction = new URL(location.href);
+  const incomingMode = emailAction.searchParams.get('mode');
+  let actionMode = ['verifyEmail','resetPassword'].includes(incomingMode) && emailAction.searchParams.get('oobCode') ? incomingMode : '';
+  if (actionMode) history.replaceState(null,'',location.pathname);
 
   function show(text) {
     message.textContent = text;
@@ -576,8 +581,8 @@ async function startStaffApp(apiOrigin, mountApp) {
   function emailActionCode(value, mode) {
     try {
       const link = new URL(value.trim());
-      if (link.origin === 'https://'+auth.app.options.authDomain &&
-          link.pathname === '/__/auth/action' && link.searchParams.get('mode') === mode) {
+      if (((link.origin === 'https://'+auth.app.options.authDomain && link.pathname === '/__/auth/action') ||
+           (link.origin === 'https://jninforner.github.io' && link.pathname === '/tracacomandes/')) && link.searchParams.get('mode') === mode) {
         return link.searchParams.get('oobCode');
       }
     } catch {
@@ -598,7 +603,13 @@ async function startStaffApp(apiOrigin, mountApp) {
         const email = await verifyPasswordResetCode(auth,code);
         await confirmPasswordReset(auth,code,resetForm.elements.password.value);
         resetForm.reset();
+        resetForm.elements.link.closest('label').hidden = false;
         resetPanel.open = false;
+        if (actionMode) {
+          actionMode = '';
+          if (auth.currentUser) await signOut(auth);
+          await enter(null);
+        }
         emailField.value = email;
         form.elements.password.value = '';
         form.elements.password.focus();
@@ -638,7 +649,7 @@ async function startStaffApp(apiOrigin, mountApp) {
     event.preventDefault();
     void withFeedback(async () => {
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user && actionMode !== 'verifyEmail') return;
       const code = emailActionCode(repair.elements.link.value,'verifyEmail');
       if (!code) {
         show('Enganxa l’enllaç complet del correu de verificació de TraçaComandes.');
@@ -646,15 +657,23 @@ async function startStaffApp(apiOrigin, mountApp) {
       }
       try {
         const info = await checkActionCode(auth,code);
-        if (info.operation !== 'VERIFY_EMAIL' || info.data.email?.toLowerCase() !== user.email?.toLowerCase()) {
+        if (info.operation !== 'VERIFY_EMAIL' || (user && actionMode !== 'verifyEmail' && info.data.email?.toLowerCase() !== user.email?.toLowerCase())) {
           show('Aquest enllaç correspon a un altre compte.');
           return;
         }
         await applyActionCode(auth,code);
         repair.reset();
-        await reload(user);
-        await user.getIdToken(true);
-        await enter(user);
+        actionMode = '';
+        if (user && info.data.email?.toLowerCase() === user.email?.toLowerCase()) {
+          await reload(user);
+          await user.getIdToken(true);
+          await enter(user);
+        } else {
+          if (user) await signOut(auth);
+          await enter(null);
+          emailField.value = info.data.email || '';
+          show('Correu verificat. Ja pots iniciar sessió.');
+        }
       } catch (error) {
         if (['auth/invalid-action-code','auth/expired-action-code'].includes(error.code)) {
           show('L’enllaç ha caducat o ja s’ha utilitzat. Prem «Comprova l’accés» o demana un correu nou.');
@@ -670,7 +689,19 @@ async function startStaffApp(apiOrigin, mountApp) {
     location.reload();
   });
 
+  if (actionMode) {
+    form.hidden = true;
+    resetPanel.hidden = actionMode !== 'resetPassword';
+    resetPanel.open = !resetPanel.hidden;
+    repair.hidden = actionMode !== 'verifyEmail';
+    const current = resetPanel.hidden ? repair : resetForm;
+    current.elements.link.value = emailAction.href;
+    current.elements.link.closest('label').hidden = true;
+    show(actionMode === 'resetPassword' ? 'Tria una contrasenya nova.' : 'Prem el botó per confirmar el correu.');
+  }
+
   onAuthStateChanged(auth,user => {
+    if (actionMode) return;
     if (mounted && !user) location.reload();
     else if (!mounted) void enter(user);
   });
