@@ -81,13 +81,40 @@ button:disabled{opacity:.55;cursor:not-allowed}
   .pdf-row{grid-template-columns:1fr 1fr}
   .pdf-row label:nth-child(2){grid-column:1/-1;grid-row:2}
 }
+main{width:100%;padding-inline:max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-right))}
+.card,.grid,.grid>* ,label,.row>*{min-width:0}
+input,select,textarea,button,.button{max-width:100%;min-width:0}
+input[type=file]{width:100%}
+img,video,canvas{max-width:100%;height:auto}
+.card{overflow-wrap:anywhere}
+.grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
+#login-panel{max-width:500px;margin-inline:auto}
+#login-form .grid{grid-template-columns:minmax(0,1fr)}
+.login-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#password-reset{display:inline-block;margin:12px 0;color:var(--tx);text-underline-offset:.18em}
+#login-status:empty{display:none}
+.contact-actions{margin:8px 0 12px}
+.contact-file{position:relative;cursor:pointer}
+.contact-file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.contact-file:focus-within{outline:3px solid #788cf0;outline-offset:2px}
+.recipient-picker{margin-top:10px}
+.recipient-picker form{margin-top:12px}
+.remember-contact{display:flex;align-items:center;gap:8px;margin:12px 0}
+.remember-contact input{width:18px;min-height:18px;flex:none}
+@media(max-width:480px){
+  html{-webkit-text-size-adjust:100%}
+  .topbar{flex-wrap:wrap}
+  .top-actions{margin-inline-start:auto}
+  #line .grid,#catalog-line .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #line .grid>label:first-of-type,#catalog-line .grid>label:first-of-type{grid-column:1/-1}
+}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.4.0<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.5.0<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -107,11 +134,11 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <label>Correu<input name="email" type="email" autocomplete="username" autocapitalize="none" required></label>
 <label>Contrasenya<input name="password" type="password" autocomplete="current-password" required></label>
 </div>
-<div class="actions">
+<div class="login-actions">
 <button class="primary" value="login">Entra</button>
-<button value="register">Crea un compte</button>
-<button id="password-reset" type="button">He oblidat la contrasenya</button>
-</div></form>
+<button class="primary" value="register">Crea un compte</button>
+</div>
+<a id="password-reset" href="#reset-panel">He oblidat la contrasenya</a></form>
 <details id="reset-panel" class="item" hidden>
 <summary>Restableix amb un enllaç del correu</summary>
 <form id="reset-link-form">
@@ -298,6 +325,26 @@ async function readCatalogPdf(file, state, progress) {
   }
 }
 
+function whatsappPhone(value) {
+  const text = String(value || '').trim();
+  if (!/^\+?[\d\s().-]+$/.test(text)) return '';
+  const digits = text.replace(/\D/g,'');
+  if (digits.startsWith('00')) return whatsappPhone('+'+digits.slice(2));
+  if (!text.startsWith('+') && /^[6789]\d{8}$/.test(digits)) return '34'+digits;
+  return /^[1-9]\d{7,14}$/.test(digits) ? digits : '';
+}
+
+function vCardContact(text) {
+  const entries = text.replace(/\r?\n[ \t]/g,'').split(/\r?\n/);
+  if (entries.filter(line => /^BEGIN:VCARD$/i.test(line.trim())).length !== 1) return null;
+  const name = entries.find(line => /^(?:[\w-]+\.)?FN(?:;[^:]*)?:/i.test(line));
+  return {
+    name:name?.slice(name.indexOf(':')+1).replace(/\\[nN]/g,' ').replace(/\\([,;\\])/g,'$1').trim() || '',
+    tel:entries.filter(line => /^(?:[\w-]+\.)?TEL(?:;[^:]*)?:/i.test(line)).map(line =>
+      line.slice(line.indexOf(':')+1).replace(/^tel:/i,'').trim())
+  };
+}
+
 function mountApp(request, initialData) {
 const pendingUnit = 'pending-supplier-unit';
 const sections = {order:'Nova comanda', articles:'Articles', suppliers:'Proveïdors', categories:'Categories', units:'Unitats', history:'Historial'};
@@ -425,7 +472,7 @@ function catalog() {
     (isArticle ? '<label>Categoria<select name="category">'+options(data.categories,current?.category_id,'Sense categoria')+'</select></label><label>Unitat de compra<select name="unit">'+options(data.units.filter(unit => unit.id !== pendingUnit),current?.unit_id,'Sense unitat')+'</select></label>' : '')+
     (isSupplier ? '<label>Nom del comercial<input name="contact" maxlength="120" value="'+escape(current?.contact)+'"></label>' : '')+
     '</div>'+
-    (isSupplier ? '<label>Missatge de WhatsApp<textarea name="messageTemplate" maxlength="1000" rows="4" placeholder="Bon dia, {comercial}! Us voldríem fer aquesta comanda:">'+escape(current?.message_template)+'</textarea></label>'+
+    (isSupplier ? contactControls()+'<label>Missatge de WhatsApp<textarea name="messageTemplate" maxlength="1000" rows="4" placeholder="Bon dia, {comercial}! Us voldríem fer aquesta comanda:">'+escape(current?.message_template)+'</textarea></label>'+
       '<p class="meta">Pots fer servir <code>{comercial}</code>, <code>{proveidor}</code> i <code>{articles}</code>. Si deixes el missatge buit, s’utilitzarà el text per defecte.</p>' : '')+
     '<div class="actions"><button class="primary">Desa</button>'+(current ? '<button type="button" data-cancel>Cancel·la</button>' : '')+'</div></form></article>'+
     (section === 'articles' && current ? offerEditor(current) : '')+
@@ -563,7 +610,7 @@ function catalogLine(article, offers) {
   return '<form id="catalog-line" class="catalog-line" aria-label="Afegeix '+escape(article.name)+' a la comanda">'+
     '<input type="hidden" name="article" value="'+escape(article.id)+'"><div class="grid">'+
     '<label>Proveïdor<select name="supplier" required>'+options(suppliers,supplier?.supplier_id,'Tria un proveïdor')+'</select></label>'+
-    '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" required></label>'+
+    '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" value="1" required></label>'+
     '<label>Unitat<select name="unit" required>'+options(purchaseUnits(),offerUnit(article,supplier),'Tria una unitat')+'</select></label></div>'+
     '<div class="actions"><button class="primary">Afegeix la línia</button><button type="button" data-close-line>Cancel·la</button></div></form>';
 }
@@ -602,7 +649,7 @@ function order() {
     '<div class="actions"><button id="quick-toggle" aria-expanded="'+creatingArticle+'">Nou article</button></div>'+quickArticle+
     '<form id="line"><input type="hidden" id="article" name="article"><div class="grid">'+
     '<label>Proveïdor<select id="supplier" required name="supplier"></select></label>'+
-    '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" required></label>'+
+    '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" value="1" required></label>'+
     '<label>Unitat<select id="line-unit" name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label>'+
     '</div><p id="order-supplier-status" class="meta"></p><button id="add-line">Afegeix la línia</button></form>'+
     '</article><article class="card"><h2>Línies de la comanda</h2>'+
@@ -679,10 +726,36 @@ function history() {
     }).join('') || empty('Encara no hi ha comandes desades.'))+'</article>';
 }
 
-function supplierMessage(lines, current) {
+function contactControls() {
+  return '<div class="contact-actions actions">'+
+    (typeof navigator.contacts?.select === 'function' ? '<button type="button" data-pick-contact>Tria de l’agenda</button>' : '')+
+    '<label class="button contact-file">Importa una targeta de contacte<input type="file" data-contact-file accept=".vcf,text/vcard,text/x-vcard"></label>'+
+    '<label data-contact-choice hidden>Telèfon del contacte<select></select></label></div>';
+}
+
+function fillContact(form, contact) {
+  const phones = [...new Set((contact.tel || []).map(whatsappPhone).filter(Boolean))];
+  if (!phones.length) {
+    notify('El contacte no té cap telèfon vàlid. Escriu el número amb el prefix internacional.',true);
+    return;
+  }
+  if (contact.name) form.elements.contact.value = contact.name.slice(0,120);
+  const choice = form.querySelector('[data-contact-choice]');
+  choice.hidden = phones.length < 2;
+  choice.querySelector('select').innerHTML = options(phones.map(phone => ({id:phone,name:'+'+phone})),'','Tria un telèfon');
+  form.elements.phone.value = phones.length === 1 ? '+'+phones[0] : '';
+  if (phones.length > 1) choice.querySelector('select').focus();
+  notify(phones.length > 1 ? 'Tria quin número de l’agenda vols fer servir.' : '');
+}
+
+function whatsappLink(phone, message) {
+  return 'https://wa.me/'+phone+'?text='+encodeURIComponent(message);
+}
+
+function supplierMessage(lines, current, recipient) {
   const supplier = lines[0];
   const articles = lines.map(line => '• '+quantityFormat.format(line.quantity)+' '+line.unit+' de '+line.article).join('\n');
-  const contact = supplier.contact ?? current?.contact;
+  const contact = recipient || current?.contact || supplier.contact;
   const template = supplier.message_template ?? current?.message_template;
   const hello = contact ? 'Bon dia, '+contact+'!' : 'Bon dia!';
   if (!template) return hello+' Us voldríem fer aquesta comanda:\n\n'+articles+'\n\nGràcies!';
@@ -694,12 +767,39 @@ function supplierMessage(lines, current) {
 function messageCard(lines) {
   const supplier = lines[0];
   const current = byId('suppliers',supplier.supplier_id);
-  const phone = current?.phone || supplier.phone;
+  const phone = current?.phone || supplier.phone || '';
   const message = supplierMessage(lines,current);
-  const link = 'https://wa.me/'+(phone || '')+'?text='+encodeURIComponent(message);
-  return '<section class="item"><h3>'+escape(supplier.supplier)+'</h3><label>Missatge<textarea readonly rows="'+Math.min(13,lines.length+4)+'">'+escape(message)+'</textarea></label><div class="actions">'+
-    '<a class="button whatsapp" href="'+escape(link)+'">'+(phone ? 'Obre WhatsApp' : 'Tria el contacte a WhatsApp')+'</a>'+
-    '<button data-copy>Copia el missatge</button></div></section>';
+  const chooser = !phone && current ? '<details class="recipient-picker"><summary class="button whatsapp">Tria el contacte per a WhatsApp</summary>'+
+    '<form data-order-recipient data-order-id="'+escape(supplier.order_id)+'" data-supplier-id="'+escape(supplier.supplier_id)+'">'+
+    '<div class="grid"><label>Nom del comercial<input name="contact" maxlength="120" value="'+escape(current.contact)+'"></label>'+
+    '<label>Telèfon de WhatsApp<input name="phone" type="tel" placeholder="+34 600 000 000" required></label></div>'+
+    contactControls()+'<label class="remember-contact"><input name="remember" type="checkbox"> Vols desar aquest contacte per a les properes comandes?</label>'+
+    '<button class="primary" type="submit">Obre WhatsApp</button></form></details>' :
+    '<a class="button whatsapp" href="'+escape(whatsappLink(phone,message))+'">Obre WhatsApp</a>';
+  return '<section class="item"><h3>'+escape(supplier.supplier)+'</h3><label>Missatge<textarea readonly rows="'+Math.min(13,lines.length+4)+'">'+escape(message)+'</textarea></label>'+
+    '<div class="actions"><button data-copy>Copia el missatge</button>'+
+    (!phone && current ? '<a href="'+escape(whatsappLink('',message))+'">Tria dins de WhatsApp</a>' : '')+'</div>'+chooser+'</section>';
+}
+
+async function openOrderRecipient(form, button) {
+  if (busy) return;
+  const phone = whatsappPhone(form.elements.phone.value);
+  if (!phone) {
+    notify('Indica un número de WhatsApp amb el prefix internacional.',true);
+    form.elements.phone.focus();
+    return;
+  }
+  const supplier = byId('suppliers',form.dataset.supplierId);
+  const lines = data.lines.filter(line => line.order_id === form.dataset.orderId && line.supplier_id === supplier?.id);
+  if (!lines.length) return;
+  const contact = form.elements.contact.value.trim();
+  const link = whatsappLink(phone,supplierMessage(lines,supplier,contact));
+  if (form.elements.remember.checked) {
+    let saved = false;
+    await save({action:'assignSupplierContact',id:supplier.id,phone,contact},() => {saved = true;},button,()=>'Contacte desat per a les properes comandes.');
+    if (!saved) return;
+  }
+  location.assign(link);
 }
 
 function staff() {
@@ -761,6 +861,13 @@ document.addEventListener('click',async event => {
     render();
     document.querySelector('#catalog input').focus();
     document.querySelector('#catalog').scrollIntoView({block:'nearest'});
+  } else if (Object.hasOwn(target,'pickContact')) {
+    try {
+      const [contact] = await navigator.contacts.select(['name','tel'],{multiple:false});
+      if (contact && button.form.isConnected) fillContact(button.form,{name:contact.name?.[0],tel:contact.tel});
+    } catch (error) {
+      if (error.name !== 'AbortError') notify('Pots importar una targeta de contacte o escriure el número.',true);
+    }
   } else if (target.removeStaff) {
     await save({action:'staffRemove',email:target.removeStaff},null,button);
   } else if (target.pickArticle) {
@@ -802,6 +909,25 @@ document.addEventListener('click',async event => {
 });
 
 document.addEventListener('change', async event => {
+  if (event.target.matches('[data-contact-choice] select')) {
+    event.target.form.elements.phone.value = event.target.value ? '+'+event.target.value : '';
+    return;
+  }
+  if (Object.hasOwn(event.target.dataset,'contactFile')) {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const contact = file.size <= 256*1024 ? vCardContact(await file.text()) : null;
+      if (!event.target.isConnected) return;
+      if (!contact) throw new Error();
+      fillContact(event.target.form,contact);
+    } catch {
+      notify('Tria una targeta .vcf amb un sol contacte.',true);
+    } finally {
+      event.target.value = '';
+    }
+    return;
+  }
   if (Object.hasOwn(event.target.dataset,'lineUnit')) {
     const index = Number(event.target.dataset.lineUnit);
     const unit = event.target.value;
@@ -869,7 +995,9 @@ document.addEventListener('submit',async event => {
   if (!form.closest('#workspace')) return;
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form));
-  if (Object.hasOwn(form.dataset,'editQuantity')) {
+  if (Object.hasOwn(form.dataset,'orderRecipient')) {
+    await openOrderRecipient(form,event.submitter);
+  } else if (Object.hasOwn(form.dataset,'editQuantity')) {
     const index = Number(form.dataset.editQuantity);
     const quantity = form.elements.quantity.valueAsNumber;
     if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -884,6 +1012,14 @@ document.addEventListener('submit',async event => {
   } else if (form.id === 'confirm-pdf') {
     await importReviewedCatalog(form,event.submitter);
   } else if (form.id === 'catalog') {
+    if (section === 'suppliers' && values.phone.trim()) {
+      values.phone = whatsappPhone(values.phone);
+      if (!values.phone) {
+        notify('Indica un número de WhatsApp vàlid.',true);
+        form.elements.phone.focus();
+        return;
+      }
+    }
     await save({...values,action:section,id:edit},result => {
       edit = section === 'articles' ? result.id : '';
     },event.submitter);
@@ -1085,11 +1221,14 @@ async function startStaffApp(apiOrigin, mountApp) {
     });
   });
 
-  document.querySelector('#password-reset').onclick = () => withFeedback(async () => {
-    if (!emailField.reportValidity()) return;
-    await sendPasswordResetEmail(auth,emailField.value.trim());
-    show('Si existeix un compte amb aquest correu, rebràs un enllaç per restablir la contrasenya.');
-  });
+  document.querySelector('#password-reset').onclick = event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      if (!emailField.reportValidity()) return;
+      await sendPasswordResetEmail(auth,emailField.value.trim());
+      show('Si existeix un compte amb aquest correu, rebràs un enllaç per restablir la contrasenya.');
+    });
+  };
 
   document.querySelector('#retry-login').onclick = () => withFeedback(async () => {
     if (!auth.currentUser) return;
