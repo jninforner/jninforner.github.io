@@ -64,13 +64,30 @@ button:disabled{opacity:.55;cursor:not-allowed}
   .version{font-size:13px}
 }
 .catalog-line{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--soft)}
+:root{--draft-highlight:#edf8f1}
+:root[data-theme=dark]{--draft-highlight:#19332e}
+.item.in-draft,.order-matches button.in-draft{background:var(--draft-highlight)}
+.item.in-draft{padding-inline:10px;border-radius:8px}
+.draft-badge{display:inline-block;margin-inline-start:8px;color:var(--green);font-size:13px;font-weight:650}
+.order-matches .draft-badge{margin-inline-start:0}
+.draft-quantity{width:7rem}
+.draft-quantity-form{display:flex;align-items:end;gap:6px}
+#read-catalog button,#confirm-pdf>.actions{margin-top:10px}
+.pdf-rows{max-height:55vh;overflow:auto;margin-top:12px}
+.pdf-row{display:grid;grid-template-columns:5rem minmax(9rem,2fr) repeat(2,minmax(5rem,1fr));gap:8px;padding:10px 0;border-top:1px solid var(--border)}
+.pdf-select{display:flex;align-items:center;align-self:center;white-space:nowrap}
+.pdf-select input{width:18px;min-height:18px}
+@media(max-width:550px){
+  .pdf-row{grid-template-columns:1fr 1fr}
+  .pdf-row label:nth-child(2){grid-column:1/-1;grid-row:2}
+}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.3.0<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>TraçaComandes</h1><div class="meta version">Versió 1.4.0<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -96,7 +113,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <button id="password-reset" type="button">He oblidat la contrasenya</button>
 </div></form>
 <details id="reset-panel" class="item" hidden>
-<summary>L’enllaç per canviar la contrasenya dona error?</summary>
+<summary>Restableix amb un enllaç del correu</summary>
 <form id="reset-link-form">
 <div class="grid">
 <label>Enllaç del correu de restabliment<input name="link" type="url" autocomplete="off" autocapitalize="none" required></label>
@@ -118,6 +135,169 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </div>
 </main>
 <script type="module">
+const pdfLibrary = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/legacy/build/';
+const ocrLibrary = 'https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.esm.min.js';
+const pdfKey = value => String(value || '').normalize('NFD').replace(/\p{Diacritic}/gu,'')
+  .toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+const unitsInPdf = {
+  caixa:'caixes', caixes:'caixes', caja:'caixes', cajas:'caixes', kg:'kg', kgs:'kg',
+  unitat:'unitats', unitats:'unitats', ut:'unitats', uts:'unitats', ud:'unitats', uds:'unitats',
+  pieza:'peces', peces:'peces', bossa:'bosses', bosses:'bosses', bolsa:'bosses', bolsas:'bosses',
+  safata:'safates', safates:'safates', bandeja:'safates', pot:'pots', pots:'pots',
+  ampolla:'ampolles', ampolles:'ampolles', botella:'ampolles', botellas:'ampolles',
+  paquet:'paquets', paquets:'paquets', sac:'sacs', sacs:'sacs', llauna:'llaunes',
+  llaunes:'llaunes', litre:'litres', litres:'litres', litro:'litres', litros:'litres',
+  manat:'manats', manats:'manats', pack:'packs', packs:'packs'
+};
+const descriptionHeader = /^(?:(?:descripcio|descripcion|description)(?: del (?:article|producto)| producte)?|article|articulo|producte|producto|producto descripcion|denominacion|nom|nombre|concepto)$/;
+const otherHeader = /^(?:codigo|codi|referencia|ref|sku|ean|precio|preu|pvp|importe|total|iva|cantidad|quantitat|unidad|unitat|uds|uts|formato|format|presentacion|envase)(?: .*)?$/;
+
+function pdfTextRows(items) {
+  const lines = [];
+  const positioned = items.filter(item => item.str?.trim() && item.transform).map(item => ({
+    text:item.str.trim(), x:item.transform[4], y:item.transform[5], end:item.transform[4]+item.width,
+    size:Math.hypot(item.transform[2],item.transform[3])
+  })).sort((a,b) => b.y-a.y || a.x-b.x);
+  for (const item of positioned) {
+    const line = lines.at(-1);
+    if (line && Math.abs(line[0].y-item.y) <= 2.5) line.push(item);
+    else lines.push([item]);
+  }
+  return lines.map(line => {
+    const columns = [];
+    for (const item of line.sort((a,b) => a.x-b.x)) {
+      const last = columns.at(-1);
+      if (last && item.x-last.end <= 12) {
+        last.text += ' '+item.text;
+        last.end = Math.max(last.end,item.end);
+      } else columns.push({...item});
+    }
+    return columns;
+  });
+}
+
+function pdfSupplier(filename, head, suppliers) {
+  const basename = pdfKey(filename.replace(/\.pdf$/i,''));
+  const exact = suppliers.find(supplier => pdfKey(supplier.name) === basename);
+  if (exact) return exact.id;
+  const found = suppliers.filter(supplier => {
+    const name = pdfKey(supplier.name);
+    return name.length >= 4 && ((' '+basename+' ').includes(' '+name+' ') ||
+      head.some(line => (' '+pdfKey(line)+' ').includes(' '+name+' ')));
+  });
+  return found.length === 1 ? found[0].id : '';
+}
+
+function catalogFromPdf(pages, filename, state) {
+  const top = pages[0]?.slice(0,8).map(row => row.map(cell => cell.text).join(' ')) || [];
+  const supplier = pdfSupplier(filename,top,state.suppliers);
+  const anyList = pdfKey(top[0]) === 'falta';
+  const bodySize = (pages[0]?.[0]?.[0]?.size || 0)*0.75;
+  const supplierNames = new Set(state.suppliers.map(item => pdfKey(item.name)));
+  const categories = new Map(state.categories.map(item => [pdfKey(item.name),item.name]));
+  const articleNames = new Map();
+  for (const item of state.articles) {
+    const key = pdfKey(item.name);
+    articleNames.set(key,articleNames.has(key) ? null : item);
+  }
+  const unique = new Map();
+  let category = '';
+  for (const [pageIndex,rows] of pages.entries()) {
+    let header;
+    for (const [index,row] of rows.entries()) {
+      if (!row.length) continue;
+      const joined = row.map(cell => cell.text).join(' ');
+      const key = pdfKey(joined);
+      const heading = categories.get(key);
+      if (row.length === 1 && heading) { category = heading; continue; }
+      if (key === 'uncategorized items') { category = ''; continue; }
+      if (anyList && row[0].size && bodySize) {
+        if (row[0].size < bodySize*0.92) continue;
+        if (row.length === 1 && row[0].size > bodySize*1.08 && row[0].size < bodySize*1.25) {
+          category = joined;
+          continue;
+        }
+      }
+      const description = row.findIndex(cell => descriptionHeader.test(pdfKey(cell.text)));
+      if (description >= 0) {
+        header = {start:row[description].x,end:row[description+1]?.x ?? Infinity};
+        continue;
+      }
+      if (supplierNames.has(key) || /^(?:falta|catalogo|cataleg|tarifa|lista de precios|listado de articulos|llistat d articles|precios|pagina|page|pag |fecha|data |telefons? |telefonos? |fax |correo |email |www |https? |cif |nif |subtotal|total|iva |ref |notas? |observaciones|condiciones)(?:\b|$)/.test(key)) continue;
+      const fields = header ? row.filter(cell => cell.x >= header.start-12 && cell.x < header.end-6) : row;
+      let name = (header ? fields.map(cell => cell.text).join(' ') :
+        fields.find(cell => /\p{L}{3}/u.test(cell.text) && !otherHeader.test(pdfKey(cell.text)))?.text || '').trim();
+      if (!name || !/\p{L}{2}/u.test(name) || name.includes('@') || /^(?:€|EUR\b)/i.test(name)) continue;
+      let unit = '';
+      const parenthesis = name.match(/\s*\((?:\d+(?:[.,]\d+)?\s*[×x]\s*)?([\p{L}]+)\s*\)\s*$/u);
+      if (parenthesis && unitsInPdf[pdfKey(parenthesis[1])]) {
+        unit = unitsInPdf[pdfKey(parenthesis[1])];
+        name = name.slice(0,parenthesis.index).trim();
+      }
+      if (!unit) {
+        const unitField = row.find(cell => unitsInPdf[pdfKey(cell.text)]);
+        if (unitField) unit = unitsInPdf[pdfKey(unitField.text)];
+      }
+      const existing = articleNames.get(pdfKey(name));
+      const existingCategory = state.categories.find(item => item.id === existing?.category_id)?.name || '';
+      if (existing && (!category || category === existingCategory)) name = existing.name;
+      if (!name || name.length > 120) continue;
+      const candidateCategory = category || existingCategory;
+      const id = pdfKey(name)+'|'+pdfKey(candidateCategory);
+      const previous = unique.get(id);
+      const candidate = {name,category:candidateCategory,unit,page:pageIndex+1,include:Boolean(anyList || header || unit || existing || category || index >= 3)};
+      if (!previous || (!previous.unit && unit)) unique.set(id,candidate);
+    }
+  }
+  return {supplier, rows:[...unique.values()]};
+}
+
+async function readCatalogPdf(file, state, progress) {
+  if (file.size > 20*1024*1024) throw new Error('El PDF supera els 20 MB. Divideix-lo en fitxers més petits.');
+  const pdfjs = await import(pdfLibrary+'pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = pdfLibrary+'pdf.worker.min.mjs';
+  const task = pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false});
+  let ocr;
+  let scanned = false;
+  try {
+    const doc = await task.promise;
+    if (doc.numPages > 50) throw new Error('El PDF té més de 50 pàgines. Divideix-lo en fitxers més petits.');
+    const pages = [];
+    for (let number=1;number<=doc.numPages;number++) {
+      progress('Llegint la pàgina '+number+' de '+doc.numPages+'…');
+      const page = await doc.getPage(number);
+      const {items} = await page.getTextContent();
+      let rows = pdfTextRows(items);
+      if (items.map(item => item.str || '').join('').trim().length < 12) {
+        scanned = true;
+        progress('Reconeixent el text de la pàgina '+number+' de '+doc.numPages+'…');
+        if (!ocr) {
+          const library = await import(ocrLibrary);
+          ocr = await (library.createWorker || library.default.createWorker)(['cat','spa','eng']);
+        }
+        const canvas = document.createElement('canvas');
+        const natural = page.getViewport({scale:1});
+        const viewport = page.getViewport({scale:Math.min(2,Math.sqrt(3_000_000/(natural.width*natural.height)))});
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        try {
+          await page.render({canvas,canvasContext:canvas.getContext('2d'),viewport}).promise;
+          const {data} = await ocr.recognize(canvas);
+          rows = data.text.split('\n').filter(line => line.trim()).map(line =>
+            line.trim().split(/\s{2,}/).map((text,x) => ({text,x:x*100})));
+        } finally {
+          canvas.width = canvas.height = 0;
+        }
+      }
+      pages.push(rows);
+      page.cleanup();
+    }
+    return {...catalogFromPdf(pages,file.name,state),scanned};
+  } finally {
+    await Promise.allSettled([task.destroy(),ocr?.terminate()]);
+  }
+}
+
 function mountApp(request, initialData) {
 const pendingUnit = 'pending-supplier-unit';
 const sections = {order:'Nova comanda', articles:'Articles', suppliers:'Proveïdors', categories:'Categories', units:'Unitats', history:'Historial'};
@@ -155,6 +335,8 @@ let edit = '';
 let categoryFilter = '';
 let supplierFilter = '';
 let addingArticle = '';
+let pdfReview;
+let readingPdf = false;
 let articleSearch = '';
 let openOrder = '';
 let orderArticle = '';
@@ -247,15 +429,114 @@ function catalog() {
       '<p class="meta">Pots fer servir <code>{comercial}</code>, <code>{proveidor}</code> i <code>{articles}</code>. Si deixes el missatge buit, s’utilitzarà el text per defecte.</p>' : '')+
     '<div class="actions"><button class="primary">Desa</button>'+(current ? '<button type="button" data-cancel>Cancel·la</button>' : '')+'</div></form></article>'+
     (section === 'articles' && current ? offerEditor(current) : '')+
-    (isArticle ? '<article class="card"><details><summary>Importa el catàleg</summary><form id="import-catalog"><p class="meta">Fitxer JSON amb els articles, les categories, les unitats i els proveïdors.</p><label>Fitxer de catàleg<input name="catalog" type="file" accept=".json,application/json"></label><label>O enganxa el contingut JSON<textarea name="catalogText" rows="3"></textarea></label><button class="primary">Importa els articles</button></form></details></article>' : '')+
+    (isArticle ? pdfImportCard() : '')+
     '<article class="card"><h2>'+sections[section]+'</h2>'+filters+'<div id="catalog-rows">'+
     catalogRows()+'</div></article>';
 }
+
+function pdfImportCard() {
+  const review = pdfReview;
+  const upload = '<form id="read-catalog"><label>Catàleg del proveïdor (PDF)<input name="file" type="file" accept=".pdf,application/pdf" required></label>'+
+    '<button type="submit"'+(readingPdf ? ' disabled' : '')+'>Llegeix el PDF</button></form>';
+  return '<article class="card"><details'+(review || readingPdf ? ' open' : '')+'><summary>Importa un catàleg en PDF</summary>'+
+    (review ? pdfReviewForm(review) : upload)+'</details></article>';
+}
+
+function pdfReviewForm(review) {
+  const categoryChoices = data.categories.map(item => '<option value="'+escape(item.name)+'"></option>').join('');
+  const unitChoices = purchaseUnits().map(item => '<option value="'+escape(item.name)+'"></option>').join('');
+  return '<form id="confirm-pdf"><div class="grid"><label>Proveïdor<select name="supplier" id="pdf-supplier" required>'+
+    options(data.suppliers,review.supplier,review.supplier ? 'Tria un proveïdor' : 'No identificat · tria el proveïdor')+
+    '<option value="new">Nou proveïdor…</option></select></label>'+
+    '<label id="pdf-new-supplier" hidden>Nom del proveïdor<input name="newSupplier" maxlength="120"></label></div>'+
+    '<p class="meta">'+review.rows.length+' files detectades. Revisa els noms i desmarca les que no siguin articles.'+
+      (review.scanned ? ' El PDF inclou pàgines escanejades.' : '')+'</p>'+
+    '<datalist id="pdf-categories">'+categoryChoices+'</datalist><datalist id="pdf-units">'+unitChoices+'</datalist>'+
+    '<div class="pdf-rows" role="group" aria-label="Articles detectats">'+review.rows.map((row,index) =>
+      '<div class="pdf-row"><label class="pdf-select"><input type="checkbox" name="include" aria-label="Inclou la fila '+(index+1)+'"'+
+      (row.include ? ' checked' : '')+'> Pàg. '+row.page+'</label>'+
+      '<label>Article<input name="name" maxlength="120" value="'+escape(row.name)+'"></label>'+
+      '<label>Categoria<input name="category" list="pdf-categories" maxlength="120" value="'+escape(row.category)+'"></label>'+
+      '<label>Unitat<input name="unit" list="pdf-units" maxlength="120" value="'+escape(row.unit)+'"></label></div>'
+    ).join('')+'</div><div class="actions"><button class="primary">Importa els articles marcats</button>'+
+    '<button type="button" data-cancel-pdf>Cancel·la</button></div></form>';
+}
+
+async function analyzeCatalog(form, button) {
+  if (busy || readingPdf) return;
+  readingPdf = true;
+  button.disabled = true;
+  notify('Obrint el PDF…');
+  try {
+    const review = await readCatalogPdf(form.elements.file.files[0],data,progress => {
+      if (section === 'articles') notify(progress);
+    });
+    if (!review.rows.length) throw new Error('No s’han detectat articles en aquest PDF.');
+    pdfReview = review;
+    if (section === 'articles') {
+      notify(review.supplier ? 'Revisa el proveïdor i els articles abans d’importar.' : 'Selecciona el proveïdor abans d’importar els articles.');
+      render();
+      document.querySelector('#pdf-supplier')?.focus();
+    }
+  } catch (error) {
+    if (section === 'articles') notify(error.message || 'No s’ha pogut llegir el PDF.',true);
+  } finally {
+    readingPdf = false;
+    button.disabled = false;
+  }
+}
+
+async function importReviewedCatalog(form, button) {
+  if (busy) return;
+  const supplier = form.elements.supplier.value === 'new' ? form.elements.newSupplier.value.trim() :
+    byId('suppliers',form.elements.supplier.value)?.name;
+  const articles = [...form.querySelectorAll('.pdf-row')].filter(row => row.querySelector('[name=include]').checked).map(row => ({
+    name:row.querySelector('[name=name]').value.trim(),
+    category:row.querySelector('[name=category]').value.trim(),
+    unit:row.querySelector('[name=unit]').value.trim(),
+    supplier
+  }));
+  if (!supplier || !articles.length || articles.some(article => !article.name)) {
+    notify('Indica el proveïdor i marca les files que vols importar. Cada article ha de tenir nom.',true);
+    return;
+  }
+  const batches = [];
+  for (let index=0;index<articles.length;index+=150) batches.push(articles.slice(index,index+150));
+  const totals = {imported:0,suppliers:0,links:0};
+  busy = true;
+  button.disabled = true;
+  setSync('Desant…');
+  try {
+    for (const [index,batch] of batches.entries()) {
+      notify('Important articles · '+(index+1)+' de '+batches.length+'…');
+      const result = await api({action:'importCatalog',articles:batch});
+      for (const key of Object.keys(totals)) totals[key] += result[key];
+    }
+    data = await api();
+    pdfReview = null;
+    setSync('Sincronitzat');
+    notify(totals.imported+' articles nous i '+totals.links+' opcions de compra desades per a '+supplier+'.');
+    render();
+  } catch (error) {
+    setSync('Revisa la importació');
+    notify(error.message+' Pots tornar a prémer Importa per completar les files pendents.',true);
+  } finally {
+    busy = false;
+    button.disabled = false;
+  }
+}
+
+function draftArticleIds() {
+  return new Set(data.draft.lines.map(line => line.article));
+}
+
+const draftBadge = '<span class="draft-badge">✓ A la comanda</span>';
 
 function catalogRows() {
   const isArticle = section === 'articles';
   const isSupplier = section === 'suppliers';
   const query = searchKey(articleSearch);
+  const added = isArticle ? draftArticleIds() : null;
   const names = {suppliers:'proveïdor',articles:'article',units:'unitat',categories:'categoria'};
   return data[section].filter(item => item.id !== pendingUnit).map(item => {
     const linked = isArticle ? data.offers.filter(offer => offer.article_id === item.id) : [];
@@ -268,8 +549,9 @@ function catalogRows() {
       ? '<button data-browse-articles="'+escape(item.id)+'">Mostra els articles</button>' : '';
     const order = isArticle ? '<button data-add-article="'+escape(item.id)+'" aria-expanded="'+(addingArticle === item.id)+'"'+
       (linked.length ? '' : ' disabled')+'>Afegeix a la comanda</button>' : '';
-    return '<div class="item"><div class="row"><div><strong>'+escape(item.name)+'</strong>'+
-      (detail ? '<div class="meta">'+escape(detail)+'</div>' : '')+'</div><div class="actions">'+order+browse+
+    const inDraft = added?.has(item.id);
+    return '<div class="item'+(inDraft ? ' in-draft' : '')+'"><div class="row"><div><strong>'+escape(item.name)+'</strong>'+
+      (inDraft ? draftBadge : '')+(detail ? '<div class="meta">'+escape(detail)+'</div>' : '')+'</div><div class="actions">'+order+browse+
       '<button data-edit="'+escape(item.id)+'">Edita</button></div></div>'+
       (isArticle && addingArticle === item.id ? catalogLine(item,linked) : '')+'</div>';
   }).join('') || empty('Cap '+names[section]+' per mostrar.');
@@ -324,8 +606,12 @@ function order() {
     '<label>Unitat<select id="line-unit" name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label>'+
     '</div><p id="order-supplier-status" class="meta"></p><button id="add-line">Afegeix la línia</button></form>'+
     '</article><article class="card"><h2>Línies de la comanda</h2>'+
-    (draft.map((line,index) => '<div class="row item"><div><strong>'+escape(byId('articles',line.article)?.name)+'</strong> · '+escape(quantityFormat.format(line.quantity))+
-      '<div class="meta">'+escape(byId('suppliers',line.supplier)?.name)+'</div></div><label>Unitat<select data-line-unit="'+index+'" aria-label="Unitat de la línia '+(index+1)+'">'+
+    (draft.map((line,index) => '<div class="row item"><div><strong>'+escape(byId('articles',line.article)?.name)+'</strong>'+
+      '<div class="meta">'+escape(byId('suppliers',line.supplier)?.name)+'</div></div>'+
+      '<form class="draft-quantity-form" data-edit-quantity="'+index+'">'+
+      '<label>Quantitat<input class="draft-quantity" name="quantity" aria-label="Quantitat de la línia '+(index+1)+'" type="number" step="any" inputmode="decimal" required value="'+escape(line.quantity)+'"></label>'+
+      '<button type="submit" aria-label="Desa la quantitat de la línia '+(index+1)+'">Desa</button></form>'+
+      '<label>Unitat<select data-line-unit="'+index+'" aria-label="Unitat de la línia '+(index+1)+'">'+
       options(purchaseUnits(),line.unit,'Tria una unitat')+'</select></label><button class="remove" data-remove="'+index+'">Treu</button></div>').join('') || empty('Encara no hi ha cap línia.'))+
     (draft.length ? '<div class="actions item"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+'</article>';
 }
@@ -334,14 +620,16 @@ function orderOptions() {
   const matches = orderSearch.trim() && showMatches ? orderMatches() : [];
   const results = document.querySelector('#order-matches');
   results.hidden = !matches.length;
+  const added = draftArticleIds();
   results.innerHTML = matches.map(article => {
     const category = byId('categories',article.category_id)?.name;
-    return '<button type="button" data-pick-article="'+escape(article.id)+'">'+escape(article.name)+
-      (category ? '<span class="meta">'+escape(category)+'</span>' : '')+'</button>';
+    const inDraft = added.has(article.id);
+    return '<button type="button" data-pick-article="'+escape(article.id)+'"'+(inDraft ? ' class="in-draft"' : '')+'>'+escape(article.name)+
+      (inDraft ? draftBadge : '')+(category ? '<span class="meta">'+escape(category)+'</span>' : '')+'</button>';
   }).join('');
   const selected = byId('articles',orderArticle);
   document.querySelector('#article').value = selected?.id || '';
-  document.querySelector('#order-match-status').textContent = selected ? 'Article triat: '+selected.name :
+  document.querySelector('#order-match-status').textContent = selected ? 'Article triat: '+selected.name+(added.has(selected.id) ? ' · Ja és a la comanda.' : '') :
     orderSearch.trim() && !matches.length ? 'Cap article coincideix amb la cerca. Pots crear-lo amb «Nou article».' : '';
   supplierOptions();
 }
@@ -445,6 +733,10 @@ document.addEventListener('click',async event => {
     edit = '';
     notify('');
     render();
+  } else if (Object.hasOwn(target,'cancelPdf')) {
+    pdfReview = null;
+    notify('');
+    render();
   } else if (target.browseArticles) {
     supplierFilter = section === 'suppliers' ? target.browseArticles : '';
     categoryFilter = section === 'categories' ? target.browseArticles : '';
@@ -482,6 +774,13 @@ document.addEventListener('click',async event => {
   } else if (Object.hasOwn(target,'remove')) {
     await saveDraft(data.draft.lines.filter((_,index) => index !== Number(target.remove)),button);
   } else if (button.id === 'generate') {
+    const pending = [...content.querySelectorAll('[data-edit-quantity]')].find(form =>
+      form.elements.quantity.valueAsNumber !== data.draft.lines[Number(form.dataset.editQuantity)].quantity);
+    if (pending) {
+      notify('Desa la quantitat que has modificat abans de generar els missatges.',true);
+      pending.elements.quantity.focus();
+      return;
+    }
     await save({action:'order',revision:data.draft.revision}, result => {
       section = 'history';
       openOrder = result.id;
@@ -513,6 +812,12 @@ document.addEventListener('change', async event => {
     await saveDraft(data.draft.lines.map((line,position) => position === index ? {...line,unit} : line));
     if (event.target.isConnected) event.target.value = data.draft.lines[index].unit;
     return;
+  }
+  if (event.target.id === 'pdf-supplier') {
+    const field = event.target.form.elements.newSupplier;
+    field.closest('label').hidden = event.target.value !== 'new';
+    field.required = event.target.value === 'new';
+    if (field.required) field.focus();
   }
   if (event.target.id === 'supplier') defaultUnit();
   if (event.target.id === 'category-filter' || event.target.id === 'supplier-filter') {
@@ -564,15 +869,20 @@ document.addEventListener('submit',async event => {
   if (!form.closest('#workspace')) return;
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form));
-  if (form.id === 'staff-access') {
-    await save({action:'staffAdd',email:values.email},null,event.submitter);
-  } else if (form.id === 'import-catalog') {
-    try {
-      const articles = JSON.parse(values.catalogText.trim() || await values.catalog.text());
-      await save({action:'importCatalog',articles},null,event.submitter, result => result.links || result.suppliers ? result.imported+' articles nous, '+result.suppliers+' proveïdors nous i '+result.links+' vincles nous.' : result.imported+' articles importats.');
-    } catch {
-      notify('El fitxer de catàleg ha de ser un JSON vàlid.',true);
+  if (Object.hasOwn(form.dataset,'editQuantity')) {
+    const index = Number(form.dataset.editQuantity);
+    const quantity = form.elements.quantity.valueAsNumber;
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      notify('La quantitat ha de ser un número més gran que zero.',true);
+      return;
     }
+    await saveDraft(data.draft.lines.map((line,position) => position === index ? {...line,quantity} : line),event.submitter);
+  } else if (form.id === 'staff-access') {
+    await save({action:'staffAdd',email:values.email},null,event.submitter);
+  } else if (form.id === 'read-catalog') {
+    await analyzeCatalog(form,event.submitter);
+  } else if (form.id === 'confirm-pdf') {
+    await importReviewedCatalog(form,event.submitter);
   } else if (form.id === 'catalog') {
     await save({...values,action:section,id:edit},result => {
       edit = section === 'articles' ? result.id : '';
