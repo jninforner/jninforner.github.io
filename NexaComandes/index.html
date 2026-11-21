@@ -152,12 +152,13 @@ img,video,canvas{max-width:100%;height:auto}
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.6.4<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.8.2<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
       <div id="menu-panel" hidden>
         <nav aria-label="Seccions" id="tabs"></nav>
+        <a class="button" href="https://comandes-cuina-mworkeza.shinyshrew16.chatgpt.site/NexaTips/">NexaTips</a>
         <button id="theme" type="button" aria-pressed="false">Mode fosc</button>
       </div>
     </div>
@@ -922,9 +923,12 @@ async function openOrderRecipient(form, button) {
 function staff() {
   return '<article class="card"><h2>Accés de l’equip</h2>'+
     '<p class="meta">Ets l’administrador de NexaComandes. Pots autoritzar usuaris i retirar-los l’accés.</p>'+
-    '<form id="staff-access"><div class="grid"><label>Correu del treballador<input type="email" name="email" autocomplete="off" required></label></div>'+
+    '<form id="staff-access"><div class="grid"><label>Treballador de NexaTips<select name="worker" required><option value="">Tria una persona</option>'+
+    (data.tipWorkers ?? []).slice().sort((a,b) => a.name.localeCompare(b.name,'ca')).map(person =>
+      '<option value="'+escape(person.id)+'">'+escape(person.name)+'</option>').join('')+
+    '</select></label><label>Correu del treballador<input type="email" name="email" autocomplete="off" required></label></div>'+
     '<button class="primary">Autoritza</button></form>'+
-    (data.staff.map(person => '<div class="row item"><span>'+escape(person.email)+'</span><button data-remove-staff="'+escape(person.email)+'">Retira l’accés</button></div>').join('') ||
+    (data.staff.map(person => '<div class="row item"><span>'+(person.name ? escape(person.name)+' · ' : '')+escape(person.email)+'</span><button data-remove-staff="'+escape(person.email)+'">Retira l’accés</button></div>').join('') ||
       empty('Encara no hi ha treballadors autoritzats.'))+'</article>';
 }
 
@@ -1150,7 +1154,7 @@ document.addEventListener('submit',async event => {
     const lines = data.draft.lines.map((line,position) => position === Number(index) ? {...line,quantity,unit:values.unit,supplier:values.supplier} : line);
     await saveDraft(combineDraftLines(lines),event.submitter);
   } else if (form.id === 'staff-access') {
-    await save({action:'staffAdd',email:values.email},null,event.submitter);
+    await save({action:'staffAdd',worker:values.worker,email:values.email},null,event.submitter);
   } else if (form.id === 'read-catalog') {
     await analyzeCatalog(form,event.submitter);
   } else if (form.id === 'confirm-pdf') {
