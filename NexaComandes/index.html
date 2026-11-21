@@ -199,7 +199,7 @@ img,video,canvas{max-width:100%;height:auto}
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.11.3<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.12.0<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-label="Menú" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">☰</span><span class="top-action-label" aria-hidden="true">Menú</span></button>
@@ -453,6 +453,43 @@ function combineDraftLines(lines) {
   return [...combined.values()];
 }
 
+function workerContactFromShortcut(text) {
+  const [header,...lines] = text.trim().split(/\r?\n/);
+  if (header !== 'NEXA-CONTACTE') return null;
+  const values = new Map();
+  let field;
+  for (const line of lines) {
+    const match = /^(nom|correu|telèfon)\s*:\s*(.*)$/iu.exec(line);
+    if (match) {
+      field = match[1].toLocaleLowerCase('ca');
+      values.set(field,[match[2]]);
+    } else if (field && line.trim()) {
+      values.get(field).push(line.trim());
+    }
+  }
+  const name = (values.get('nom') ?? []).filter(Boolean).join(' ').trim();
+  const email = (values.get('correu') ?? []).map(value => value.trim()).filter(Boolean);
+  const tel = (values.get('telèfon') ?? []).map(value => value.trim()).filter(Boolean);
+  return name || email.length || tel.length ? {name, email, tel} : null;
+}
+
+function renderAppleContactPicker() {
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!ios || typeof navigator.contacts?.select === 'function') return '';
+  return '<details class="item" data-worker-ios-panel><summary>Tria de l’agenda de l’iPhone</summary>'+
+    '<p class="meta">Obre la drecera, tria la persona i torna a aquesta fitxa per enganxar el contacte.</p>'+
+    '<a class="button" href="shortcuts://run-shortcut?name=Nexa%20Contacte">Obre el selector de Dreceres</a>'+
+    '<label>Enganxa el contacte<textarea rows="3" data-worker-contact-paste spellcheck="false" autocapitalize="off"></textarea></label>'+
+    '<button type="button" data-worker-apply-paste>Carrega el contacte</button>'+
+    '<details class="item"><summary>Configura la drecera el primer cop</summary>'+
+    '<ol><li>A l’app Dreceres, crea una drecera que es digui <strong>Nexa Contacte</strong>.</li>'+
+    '<li>Afegeix l’acció <strong>Selecciona un contacte</strong> i deixa la selecció múltiple desactivada.</li>'+
+    '<li>Afegeix l’acció <strong>Text</strong>. Copia el format següent i, després de cada etiqueta, insereix la propietat corresponent del contacte seleccionat: nom complet, correu i telèfon.</li>'+
+    '<li>Afegeix <strong>Copia al porta-retalls</strong> amb el text anterior.</li></ol>'+
+    '<pre>NEXA-CONTACTE\nNom: \nCorreu: \nTelèfon: </pre></details></details>';
+}
+
 function renderWorkerProfiles(workers, escapeHtml) {
   const sorted = workers.slice().sort((a,b) => a.name.localeCompare(b.name,'ca'));
   const form = worker =>
@@ -460,6 +497,7 @@ function renderWorkerProfiles(workers, escapeHtml) {
     '<div class="actions worker-contact-actions">'+
     (typeof navigator.contacts?.select === 'function' ? '<button type="button" data-worker-contact>Tria de l’agenda</button>' : '')+
     (isMobileContactDevice() ? '' : '<label class="button">Importa contacte Apple (.vcf)<input type="file" accept=".vcf,text/vcard,text/x-vcard" data-worker-vcard></label>')+'</div>'+
+    renderAppleContactPicker()+
     '<input type="hidden" name="contactName" value="'+escapeHtml(worker?.contactName ?? '')+'">'+
     '<input type="hidden" name="contactUid" value="'+escapeHtml(worker?.contactUid ?? '')+'">'+
     '<div data-worker-contact-options></div><p class="meta" data-worker-contact-status role="status" '+(worker?.contactName ? '' : 'hidden')+'>'+
@@ -544,6 +582,20 @@ function bindWorkerContacts(container) {
   }
 
   container.addEventListener('click',async event => {
+    const applyPaste = event.target.closest('[data-worker-apply-paste]');
+    if (applyPaste) {
+      const form = applyPaste.form;
+      const input = form.querySelector('[data-worker-contact-paste]');
+      const contact = workerContactFromShortcut(input.value) ?? vCardContact(input.value.trim());
+      if (!contact || !(contact.name || contact.email.length || contact.tel.length)) {
+        updateContactStatus(form,'Enganxa el contacte copiat per la drecera Nexa Contacte.');
+        return;
+      }
+      fillWorkerContact(form,contact);
+      input.value = '';
+      form.querySelector('[data-worker-ios-panel]').open = false;
+      return;
+    }
     const picker = event.target.closest('[data-worker-contact]');
     if (!picker) return;
     const {form} = picker;
@@ -660,10 +712,10 @@ let busy = false;
 const workerChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('nexa-worker-profiles') : null;
 
 async function refreshWorkerProfiles() {
-  if (!data?.staff || section !== 'staff' || busy || content.querySelector('form:focus-within')) return;
+  if (!data?.staff || section !== 'staff' || busy || content.querySelector('form:focus-within,[data-worker-ios-panel][open]')) return;
   try {
     const refreshed = await api();
-    if (section !== 'staff' || busy || content.querySelector('form:focus-within')) return;
+    if (section !== 'staff' || busy || content.querySelector('form:focus-within,[data-worker-ios-panel][open]')) return;
     data.staff = refreshed.staff;
     data.tipWorkers = refreshed.tipWorkers;
     render();
