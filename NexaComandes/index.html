@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>NexaComandes</title>
-<link rel="icon" type="image/png" href="./icon.png?v=1.11.2">
-<link rel="apple-touch-icon" sizes="180x180" href="./icon.png?v=1.11.2">
+<link rel="icon" type="image/png" href="./icon.png?v=1.11.3">
+<link rel="apple-touch-icon" sizes="180x180" href="./icon.png?v=1.11.3">
 <style>:root{color-scheme:light;--bg:#f7f8fd;--tx:#28377e;--mu:#566598;--ln:#303f91;--surface:#fff;--soft:#f0f2fc;--border:#d4daf1;--field:#b6bfdf;--on:#fff;--red:#b42318;--green:#17734a}
 :root[data-theme=dark]{color-scheme:dark;--bg:#10152c;--tx:#e5e9ff;--mu:#adb8e5;--ln:#a1afff;--surface:#1b2447;--soft:#232f59;--border:#425080;--field:#6371a0;--on:#10152c;--red:#ff9992;--green:#84dbab}
 *{box-sizing:border-box}
@@ -53,7 +53,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .version{margin-top:5px}
 .top-actions{display:flex;flex-shrink:0;gap:8px;align-items:center}
 .top-actions button{gap:7px;min-height:42px;padding:8px 12px;white-space:nowrap}
-.top-actions button span{font-size:18px;line-height:1}
+.top-actions button span:first-child{font-size:18px;line-height:1}
 .menu-anchor{position:relative}
 #menu-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:5;width:192px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 30px rgba(40,55,126,.15);padding:10px}
 #tabs{display:grid;gap:6px;margin:0 0 6px}
@@ -101,9 +101,12 @@ img,video,canvas{max-width:100%;height:auto}
 .remember-contact input{width:18px;min-height:18px;flex:none}
 @media(max-width:480px){
   html{-webkit-text-size-adjust:100%}
-  .topbar{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
-  .top-actions{flex-wrap:wrap}
-  #menu-panel{left:0;right:auto;max-width:calc(100vw - 32px)}
+  .topbar{align-items:flex-start;gap:8px;margin-bottom:8px;padding-bottom:4px}
+  .top-actions{gap:4px}
+  .top-actions #menu-toggle,.top-actions #logout{width:44px;min-height:44px;padding:0;border-color:transparent;background:transparent}
+  .top-actions .top-action-label{display:none}
+  .menu-anchor{position:static}
+  #menu-panel{top:100%;right:0;max-width:100%}
   button,.button{touch-action:manipulation}
   #line .grid,#catalog-line .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   #line .grid>label:first-of-type,#catalog-line .grid>label:first-of-type{grid-column:1/-1}
@@ -151,6 +154,26 @@ img,video,canvas{max-width:100%;height:auto}
 .article-merge-choice{display:flex;align-items:center;gap:5px;min-height:44px}
 .article-merge-choice input{width:18px;min-height:18px}
 
+.staff-worker summary{cursor:pointer}
+.staff-worker form{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:8px 0}
+.staff-worker form label{flex:1 1 14rem}
+
+@media(max-width:480px){
+  .order-lines{padding:11px}
+  .order-list-heading{display:grid;gap:6px}
+  .order-list-heading h2{font-size:19px;line-height:1.2}
+  .order-list-heading .meta{font-size:13px}
+  .order-list-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 8px}
+  .order-list-filters label{width:100%;gap:2px;font-size:12px}
+  .order-list-filters select{height:40px;min-height:40px;padding:4px 6px;text-overflow:ellipsis}
+  #order-visibility{grid-column:1/-1;justify-self:start;min-height:40px;padding-block:4px;font-size:14px}
+  .order-lines .order-lookup{margin-top:6px}
+  #order-add-search{gap:6px}
+  #order-add-search label{gap:2px;font-size:12px}
+  #order-add-search input,#order-add-search button{min-height:42px;padding-block:4px}
+  .order-category{margin-top:8px}
+}
+
 .worker-profiles .worker-profile-item{border-top:1px solid var(--border);padding:10px 0}
 .worker-profile-item>summary,.worker-profile-inactive>summary{cursor:pointer;min-height:34px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .worker-profile-item>summary::before,.worker-profile-inactive>summary::before{content:"+"}
@@ -168,22 +191,24 @@ img,video,canvas{max-width:100%;height:auto}
 .worker-contact-actions input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .worker-contact-actions label:focus-within{outline:3px solid #788cf0;outline-offset:2px}
 [data-worker-contact-options] label{margin-bottom:8px}
+
+.worker-contact-actions:empty{display:none}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.11.2<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.11.3<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
-      <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
+      <button id="menu-toggle" type="button" aria-label="Menú" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">☰</span><span class="top-action-label" aria-hidden="true">Menú</span></button>
       <div id="menu-panel" hidden>
         <nav aria-label="Seccions" id="tabs"></nav>
         <button id="theme" type="button" aria-pressed="false">Mode fosc</button>
       </div>
     </div>
-    <button id="logout" type="button" hidden><span aria-hidden="true">↪</span> Sortir</button>
+    <button id="logout" type="button" aria-label="Sortir" hidden><span aria-hidden="true">↪︎</span><span class="top-action-label" aria-hidden="true">Sortir</span></button>
   </div>
 </header>
 <section id="login-panel" class="card">
@@ -409,6 +434,11 @@ function vCardContact(text) {
   };
 }
 
+function isMobileContactDevice() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
 function combineDraftLines(lines) {
   const combined = new Map();
   for (const line of lines) {
@@ -429,7 +459,7 @@ function renderWorkerProfiles(workers, escapeHtml) {
     '<form class="worker-profile" data-worker-profile="'+escapeHtml(worker?.id ?? '')+'">'+
     '<div class="actions worker-contact-actions">'+
     (typeof navigator.contacts?.select === 'function' ? '<button type="button" data-worker-contact>Tria de l’agenda</button>' : '')+
-    '<label class="button">Importa contacte Apple (.vcf)<input type="file" accept=".vcf,text/vcard,text/x-vcard" data-worker-vcard></label></div>'+
+    (isMobileContactDevice() ? '' : '<label class="button">Importa contacte Apple (.vcf)<input type="file" accept=".vcf,text/vcard,text/x-vcard" data-worker-vcard></label>')+'</div>'+
     '<input type="hidden" name="contactName" value="'+escapeHtml(worker?.contactName ?? '')+'">'+
     '<input type="hidden" name="contactUid" value="'+escapeHtml(worker?.contactUid ?? '')+'">'+
     '<div data-worker-contact-options></div><p class="meta" data-worker-contact-status role="status" '+(worker?.contactName ? '' : 'hidden')+'>'+
@@ -523,7 +553,7 @@ function bindWorkerContacts(container) {
       form.querySelector('[data-worker-contact-options]').replaceChildren();
       fillWorkerContact(form,{...contact,name:contact.name?.[0]});
     } catch (error) {
-      if (form.isConnected && error.name !== 'AbortError') updateContactStatus(form,'Pots importar el contacte en un fitxer .vcf.');
+      if (form.isConnected && error.name !== 'AbortError') updateContactStatus(form,'No s’ha pogut obrir l’agenda. Pots escriure les dades al formulari.');
     }
   });
 
@@ -584,6 +614,7 @@ const theme = document.querySelector('#theme');
 const menuButton = document.querySelector('#menu-toggle');
 const menuPanel = document.querySelector('#menu-panel');
 const syncState = document.querySelector('#sync-state');
+const readyStatus = request ? 'Sincronitzat' : 'Entorn de prova local';
 
 function setMenu(open) {
   menuPanel.hidden = !open;
@@ -687,7 +718,7 @@ async function save(payload, done, button, success = () => 'Canvis desats.', aft
     saved = true;
     done?.(result);
     data = await api();
-    setSync('Sincronitzat');
+    setSync(readyStatus);
     notify(success(result));
     render();
     afterRender?.();
@@ -820,7 +851,7 @@ async function importReviewedCatalog(form, button) {
     }
     data = await api();
     pdfReview = null;
-    setSync('Sincronitzat');
+    setSync(readyStatus);
     notify(totals.imported+' articles nous i '+totals.links+' opcions de compra desades per a '+supplier+'.');
     render();
   } catch (error) {
@@ -926,9 +957,9 @@ function order() {
     '<div class="order-list-filters"><label>Categoria<select id="order-category-filter">'+
     options([...data.categories].sort((a,b) => a.name.localeCompare(b.name,'ca')).concat(
       data.articles.some(article => !article.category_id) ? [{id:'uncategorized',name:'Sense categoria'}] : []),
-      orderCategory,'Totes les categories')+'</select></label>'+
+      orderCategory,'Totes')+'</select></label>'+
     '<label>Proveïdor<select id="order-supplier-filter">'+
-    options(data.suppliers,orderSupplier,'Tots els proveïdors')+'</select></label>'+
+    options(data.suppliers,orderSupplier,'Tots')+'</select></label>'+
     '<button type="button" id="order-visibility" aria-pressed="'+onlyOrdered+'"><span aria-hidden="true">👁︎</span> Només la comanda</button></div></div>'+
     lookup+'<div id="order-groups">'+orderGroups(draft)+'</div>'+
     (draft.length ? '<div class="actions order-send"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+
@@ -949,7 +980,9 @@ function orderGroups(draft) {
       const lines = byArticle.get(article.id);
       return lines ? lines.map(line => orderListRow(article,line,draft.indexOf(line))).join('') : orderListRow(article);
     }).join('')+'</section>').join('') || empty(orderCategory || orderSupplier ? 'No hi ha articles que coincideixin amb els filtres.' :
-      onlyOrdered ? 'Encara no hi ha cap article a la comanda.' : 'El catàleg és buit.');
+      onlyOrdered ? 'Encara no hi ha cap article a la comanda.' :
+      !request && !data.articles.length ? 'El catàleg de prova és buit. Pots afegir-hi articles des del menú Articles.' :
+      'El catàleg és buit.');
 }
 
 function matchesOrderCategory(article) {
@@ -1060,7 +1093,7 @@ function history() {
 function contactControls() {
   return '<div class="contact-actions actions">'+
     (typeof navigator.contacts?.select === 'function' ? '<button type="button" data-pick-contact>Tria de l’agenda</button>' : '')+
-    '<label class="button contact-file">Importa una targeta de contacte<input type="file" data-contact-file accept=".vcf,text/vcard,text/x-vcard"></label>'+
+    (isMobileContactDevice() ? '' : '<label class="button contact-file">Importa una targeta de contacte<input type="file" data-contact-file accept=".vcf,text/vcard,text/x-vcard"></label>')+
     '<label data-contact-choice hidden>Telèfon del contacte<select></select></label></div>';
 }
 
@@ -1227,7 +1260,7 @@ document.addEventListener('click',async event => {
       const [contact] = await navigator.contacts.select(['name','tel'],{multiple:false});
       if (contact && button.form.isConnected) fillContact(button.form,{name:contact.name?.[0],tel:contact.tel});
     } catch (error) {
-      if (error.name !== 'AbortError') notify('Pots importar una targeta de contacte o escriure el número.',true);
+      if (error.name !== 'AbortError') notify('No s’ha pogut obrir l’agenda. Pots escriure el número al formulari.',true);
     }
   } else if (target.removeStaff) {
     await save({action:'staffRemove',email:target.removeStaff},null,button);
@@ -1477,7 +1510,7 @@ async function addDraftLine(values, button, fromCatalog = false) {
 if (!initialData) setSync('Carregant…');
 (initialData ? Promise.resolve(initialData) : api()).then(result => {
   data = result;
-  setSync('Sincronitzat');
+  setSync(readyStatus);
   notify('');
   render();
 }).catch(error => {
