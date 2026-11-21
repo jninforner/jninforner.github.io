@@ -152,7 +152,7 @@ img,video,canvas{max-width:100%;height:auto}
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.6.3<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.6.4<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -440,6 +440,7 @@ let articleSearch = '';
 let openOrder = '';
 let onlyOrdered = false;
 let orderCategory = '';
+let orderSupplier = '';
 let orderSearch = '';
 let showMatches = true;
 let creatingArticle = false;
@@ -713,6 +714,8 @@ function order() {
     options([...data.categories].sort((a,b) => a.name.localeCompare(b.name,'ca')).concat(
       data.articles.some(article => !article.category_id) ? [{id:'uncategorized',name:'Sense categoria'}] : []),
       orderCategory,'Totes les categories')+'</select></label>'+
+    '<label>Proveïdor<select id="order-supplier-filter">'+
+    options(data.suppliers,orderSupplier,'Tots els proveïdors')+'</select></label>'+
     '<button type="button" id="order-visibility" aria-pressed="'+onlyOrdered+'"><span aria-hidden="true">👁︎</span> Només la comanda</button></div></div>'+
     lookup+'<div id="order-groups">'+orderGroups(draft)+'</div>'+
     (draft.length ? '<div class="actions order-send"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+
@@ -720,9 +723,11 @@ function order() {
 }
 
 function orderGroups(draft) {
-  const byArticle = Map.groupBy(draft,line => line.article);
+  const byArticle = Map.groupBy(draft.filter(line => !orderSupplier || line.supplier === orderSupplier),line => line.article);
+  const supplierArticles = new Set(data.offers.filter(offer => offer.supplier_id === orderSupplier).map(offer => offer.article_id));
   const articles = data.articles.filter(article =>
-    (!onlyOrdered || byArticle.has(article.id)) && matchesOrderCategory(article));
+    matchesOrderCategory(article) && (onlyOrdered ? byArticle.has(article.id) :
+      !orderSupplier || supplierArticles.has(article.id) || byArticle.has(article.id)));
   const groups = Map.groupBy(articles,article => article.category_id || '');
   const sorted = [...groups].sort(([a],[b]) => categoryName(a).localeCompare(categoryName(b),'ca'));
   return sorted.map(([category,items]) =>
@@ -730,7 +735,7 @@ function orderGroups(draft) {
     items.map(article => {
       const lines = byArticle.get(article.id);
       return lines ? lines.map(line => orderListRow(article,line,draft.indexOf(line))).join('') : orderListRow(article);
-    }).join('')+'</section>').join('') || empty(orderCategory ? 'No hi ha articles visibles en aquesta categoria.' :
+    }).join('')+'</section>').join('') || empty(orderCategory || orderSupplier ? 'No hi ha articles que coincideixin amb els filtres.' :
       onlyOrdered ? 'Encara no hi ha cap article a la comanda.' : 'El catàleg és buit.');
 }
 
@@ -747,7 +752,7 @@ function orderListRow(article,line,index) {
   const id = escape(article.id);
   const suppliers = data.offers.filter(offer => offer.article_id === article.id)
     .map(offer => byId('suppliers',offer.supplier_id)).filter(Boolean);
-  const supplier = line ? byId('suppliers',line.supplier)?.name : suppliers.map(item => item.name).join(' · ');
+  const supplier = line ? byId('suppliers',line.supplier)?.name : suppliers.filter(item => !orderSupplier || item.id === orderSupplier).map(item => item.name).join(' · ');
   const detail = line
     ? quantityFormat.format(line.quantity)+' × '+(byId('units',line.unit)?.name || '')+' · '+(supplier || '')
     : supplier || 'Sense proveïdor';
@@ -801,7 +806,8 @@ function orderOptions() {
 function orderDefaults(article) {
   const units = purchaseUnits();
   const offers = data.offers.filter(offer => offer.article_id === article.id && byId('suppliers',offer.supplier_id));
-  const offer = offers.find(item => units.some(unit => unit.id === offerUnit(article,item))) || offers[0];
+  const offer = offers.find(item => item.supplier_id === orderSupplier) ||
+    offers.find(item => units.some(unit => unit.id === offerUnit(article,item))) || offers[0];
   const preferred = offerUnit(article,offer);
   return {
     supplier:offer?.supplier_id,
@@ -1008,6 +1014,9 @@ document.addEventListener('click',async event => {
     await saveDraft(data.draft.lines.filter((_,index) => index !== Number(target.remove)),button);
   } else if (button.id === 'generate') {
     await save({action:'order',revision:data.draft.revision}, result => {
+      onlyOrdered = false;
+      orderCategory = '';
+      orderSupplier = '';
       section = 'history';
       openOrder = result.id;
     },button);
@@ -1028,8 +1037,9 @@ document.addEventListener('click',async event => {
 });
 
 document.addEventListener('change', async event => {
-  if (event.target.id === 'order-category-filter') {
-    orderCategory = event.target.value;
+  if (event.target.matches('#order-category-filter, #order-supplier-filter')) {
+    if (event.target.id === 'order-category-filter') orderCategory = event.target.value;
+    else orderSupplier = event.target.value;
     document.querySelector('#order-groups').innerHTML = orderGroups(data.draft.lines);
     return;
   }
@@ -1191,6 +1201,7 @@ async function addDraftLine(values, button, fromCatalog = false) {
       addingArticle = '';
     } else {
       if (showMatches && !matchesOrderCategory(byId('articles',article))) orderCategory = '';
+      if (orderSupplier && orderSupplier !== supplier) orderSupplier = '';
       orderSearch = '';
       showMatches = false;
       creatingArticle = false;
