@@ -112,27 +112,34 @@ img,video,canvas{max-width:100%;height:auto}
 .order-lines{background:#eaf0ff;border-color:#afbfeb}
 :root[data-theme=dark] .order-lines{background:#202e55;border-color:#516798}
 
-.draft-line{display:grid;grid-template-columns:minmax(0,1fr) auto 44px;gap:8px;align-items:start}
-.draft-description{min-width:0;width:min(100%,17rem)}
-.draft-name summary{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650;cursor:pointer}
-.draft-name summary::-webkit-details-marker{display:none}
-.draft-name div{padding:4px 0;overflow-wrap:anywhere}
-.draft-remove{grid-column:3;grid-row:1;justify-self:end;width:44px;border:0;background:transparent;padding:0;font-size:27px}
-.draft-quantity-form{grid-column:2;grid-row:1;display:grid;grid-template-columns:minmax(0,5rem) minmax(0,7rem) auto;gap:6px;align-items:end}
-.draft-quantity-form input,.draft-quantity-form select{height:44px;min-height:44px;padding-inline:8px}
-.draft-quantity-form button{padding-inline:10px}
-@media(max-width:560px){
-  .draft-line{grid-template-columns:minmax(0,1fr) 44px}
-  .draft-remove{grid-column:2}
-  .draft-quantity-form{grid-column:1/-1;grid-row:2;justify-self:start;max-width:100%}
-}
+
+.order-list-heading{display:flex;align-items:start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.order-list-heading h2{margin:0}
+#order-visibility{gap:6px;padding-inline:10px}
+#order-visibility[aria-pressed=true]{background:var(--ln);color:var(--on)}
+.order-send{margin-top:12px}
+.order-category{margin-top:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.order-category h3{margin:0;padding:7px 11px;background:var(--soft);border-radius:11px 11px 0 0;font-size:15px}
+.order-list-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:start;border-top:1px solid var(--border)}
+.order-list-row.is-ordered{background:var(--soft)}
+.order-toggle,.order-pencil{border:0;border-radius:0;background:transparent}
+.order-toggle{width:100%;justify-content:start;gap:8px;padding:6px 9px;text-align:start}
+.order-marker{flex:0 0 18px;height:18px;border:1px solid var(--field);border-radius:5px;text-align:center;line-height:16px}
+.is-ordered .order-marker{background:var(--ln);color:var(--on);border-color:var(--ln)}
+.order-item-copy{display:grid;min-width:0;line-height:1.25;gap:3px}
+.order-item-copy strong,.order-item-copy .meta{overflow-wrap:anywhere}
+.order-item-copy .meta{font-weight:400}
+.order-list-row:not(.is-ordered) strong{text-decoration:line-through;text-decoration-color:var(--red);text-decoration-thickness:2px}
+.order-pencil{width:44px;padding:0;font-size:21px}
+.order-editor{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;padding:8px 10px 12px}
+.order-editor label:nth-child(3),.order-editor .actions{grid-column:1/-1}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.5.5<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.6.0<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -419,6 +426,7 @@ let readingPdf = false;
 let articleSearch = '';
 let openOrder = '';
 let orderArticle = '';
+let onlyOrdered = false;
 let orderSearch = '';
 let showMatches = true;
 let creatingArticle = false;
@@ -676,30 +684,71 @@ function order() {
     '<div class="actions">'+(data.suppliers.length ? '<button class="primary">Crea l’article</button>' : '<button type="button" data-tab="suppliers">Dona d’alta un proveïdor</button>')+
     '<button id="cancel-quick" type="button">Cancel·la</button></div></form>' : '';
   return '<article class="card"><h2>Nova comanda</h2>'+
-    '<div class="order-lookup"><label>Cerca un article<input id="order-search" type="search" aria-controls="order-matches" autocomplete="off" value="'+escape(orderSearch)+'"></label>'+
+    '<div class="order-lookup"><label>Afegeix un article<input id="order-search" placeholder="Cerca pel nom" type="search" aria-controls="order-matches" autocomplete="off" value="'+escape(orderSearch)+'"></label>'+
     '<div id="order-matches" class="order-matches" role="group" aria-label="Articles trobats" hidden></div>'+
     '<p id="order-match-status" class="meta" role="status"></p></div>'+
-    '<div class="actions"><button id="quick-toggle" aria-expanded="'+creatingArticle+'">Nou article</button></div>'+quickArticle+
+    '<div class="actions"><button id="quick-toggle" aria-expanded="'+creatingArticle+'">＋ Crea un article</button></div>'+quickArticle+
     '<form id="line"><input type="hidden" id="article" name="article"><div class="grid">'+
     '<label>Proveïdor<select id="supplier" required name="supplier"></select></label>'+
     '<label>Quantitat<input name="quantity" type="number" min="0" step="any" inputmode="decimal" value="1" required></label>'+
     '<label>Unitat<select id="line-unit" name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label>'+
     '</div><p id="order-supplier-status" class="meta"></p><button id="add-line">Afegeix la línia</button></form>'+
-    '</article><article class="card order-lines"><h2>Línies de la comanda</h2>'+
-    (draft.map((line,index) => {
-      const name = escape(byId('articles',line.article)?.name);
-      const number = index+1;
-      return '<div class="item draft-line"><div class="draft-description">'+
-        '<details class="draft-name"><summary title="'+name+'">'+name+'</summary><div>'+name+'</div></details>'+
-        '<div class="meta">'+escape(byId('suppliers',line.supplier)?.name)+'</div></div>'+
-        '<button type="button" class="remove draft-remove" data-remove="'+index+'" aria-label="Treu '+name+'"><span aria-hidden="true">×</span></button>'+
-        '<form class="draft-quantity-form" data-edit-quantity="'+index+'">'+
-        '<label>Quantitat<input name="quantity" aria-label="Quantitat de la línia '+number+'" type="number" step="any" inputmode="decimal" required value="'+escape(line.quantity)+'"></label>'+
-        '<label>Unitat<select name="unit" required aria-label="Unitat de la línia '+number+'">'+
-        options(purchaseUnits(),line.unit,'Tria una unitat')+'</select></label>'+
-        '<button type="submit" aria-label="Desa la línia '+number+'">Desa</button></form></div>';
-    }).join('') || empty('Encara no hi ha cap línia.'))+
-    (draft.length ? '<div class="actions item"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+'</article>';
+    '</article><article class="card order-lines"><div class="order-list-heading"><div><h2>Llista de la comanda</h2>'+
+    '<div class="meta">'+draftArticleIds().size+' de '+data.articles.length+' articles a la comanda</div></div>'+
+    '<button type="button" id="order-visibility" aria-pressed="'+onlyOrdered+'"><span aria-hidden="true">👁︎</span> Només la comanda</button></div>'+
+    (draft.length ? '<div class="actions order-send"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+
+    orderGroups(draft)+'</article>';
+}
+
+function orderGroups(draft) {
+  const byArticle = Map.groupBy(draft,line => line.article);
+  const articles = data.articles.filter(article => !onlyOrdered || byArticle.has(article.id));
+  const groups = Map.groupBy(articles,article => article.category_id || '');
+  const sorted = [...groups].sort(([a],[b]) => categoryName(a).localeCompare(categoryName(b),'ca'));
+  return sorted.map(([category,items]) =>
+    '<section class="order-category"><h3>'+escape(categoryName(category))+'</h3>'+
+    items.map(article => {
+      const lines = byArticle.get(article.id);
+      return lines ? lines.map(line => orderListRow(article,line,draft.indexOf(line))).join('') : orderListRow(article);
+    }).join('')+'</section>').join('') || empty(onlyOrdered ? 'Encara no hi ha cap article a la comanda.' : 'El catàleg és buit.');
+}
+
+function categoryName(id) {
+  return byId('categories',id)?.name || 'Sense categoria';
+}
+
+function orderListRow(article,line,index) {
+  const name = escape(article.name);
+  const id = escape(article.id);
+  const suppliers = data.offers.filter(offer => offer.article_id === article.id)
+    .map(offer => byId('suppliers',offer.supplier_id)).filter(Boolean);
+  const supplier = line ? byId('suppliers',line.supplier)?.name : suppliers.map(item => item.name).join(' · ');
+  const detail = line
+    ? quantityFormat.format(line.quantity)+' × '+(byId('units',line.unit)?.name || '')+' · '+(supplier || '')
+    : supplier || 'Sense proveïdor';
+  const toggle = line ? 'data-remove="'+index+'"' : 'data-mark-article="'+id+'"';
+  const pencil = '<span aria-hidden="true">✎</span>';
+  return '<div class="order-list-row'+(line ? ' is-ordered' : '')+'">'+
+    '<button type="button" class="order-toggle" '+toggle+' aria-pressed="'+Boolean(line)+'" title="'+name+'">'+
+    '<span class="order-marker" aria-hidden="true">'+(line ? '✓' : '')+'</span><span class="order-item-copy">'+
+    '<strong>'+name+'</strong><span class="meta">'+escape(detail)+'</span></span></button>'+
+    (line ? '<button type="button" class="order-pencil" data-order-editor="'+index+'" aria-expanded="false" aria-label="Edita la línia de '+name+'">'+pencil+'</button>'+
+      '<form class="order-editor" data-edit-quantity="'+index+'" hidden>'+
+      '<label>Quantitat<input name="quantity" type="number" step="any" inputmode="decimal" required value="'+escape(line.quantity)+'"></label>'+
+      '<label>Unitat<select name="unit" required>'+options(purchaseUnits(),line.unit,'Tria una unitat')+'</select></label>'+
+      '<label>Proveïdor<select name="supplier" required>'+options(suppliers,line.supplier,'Tria un proveïdor')+'</select></label>'+
+      '<div class="actions"><button type="submit" class="primary">Desa</button><button type="button" data-order-catalog="'+id+'">Edita la fitxa</button></div></form>'
+      : '<button type="button" class="order-pencil" data-order-catalog="'+id+'" aria-label="Edita '+name+'">'+pencil+'</button>')+'</div>';
+}
+
+function toggleOrderEditor(button,focus = true) {
+  const form = button.nextElementSibling;
+  form.hidden = !form.hidden;
+  button.setAttribute('aria-expanded',String(!form.hidden));
+  if (!form.hidden && focus) {
+    form.elements.quantity.focus();
+    form.elements.quantity.select();
+  }
 }
 
 function orderOptions() {
@@ -716,11 +765,13 @@ function orderOptions() {
   const selected = byId('articles',orderArticle);
   document.querySelector('#article').value = selected?.id || '';
   document.querySelector('#order-match-status').textContent = selected ? 'Article triat: '+selected.name+(added.has(selected.id) ? ' · Ja és a la comanda.' : '') :
-    orderSearch.trim() && !matches.length ? 'Cap article coincideix amb la cerca. Pots crear-lo amb «Nou article».' : '';
+    orderSearch.trim() && !matches.length ? 'Cap article coincideix amb la cerca. Pots crear-lo amb «Crea un article».' : '';
+  document.querySelector('#quick-toggle').hidden = creatingArticle || Boolean(selected) ||
+    matches.some(article => searchKey(article.name) === searchKey(orderSearch));
   supplierOptions();
 }
 
-async function pickOrderArticle(id) {
+async function pickOrderArticle(id, focusLine = true) {
   if (busy) return;
   const article = byId('articles',id);
   if (!article) return;
@@ -729,10 +780,10 @@ async function pickOrderArticle(id) {
   showMatches = false;
   document.querySelector('#order-search').value = orderSearch;
   orderOptions();
-  await addSelectedArticle();
+  await addSelectedArticle(focusLine);
 }
 
-async function addSelectedArticle() {
+async function addSelectedArticle(focusLine = true) {
   const form = document.querySelector('#line');
   const {supplier, unit, quantity} = form.elements;
   if (!supplier.value) {
@@ -743,7 +794,7 @@ async function addSelectedArticle() {
     unit.focus();
     return;
   }
-  await addDraftLine(form,{article:orderArticle,supplier:supplier.value,unit:unit.value,quantity:quantity.valueAsNumber});
+  await addDraftLine(form,{article:orderArticle,supplier:supplier.value,unit:unit.value,quantity:quantity.valueAsNumber},undefined,focusLine);
 }
 
 function supplierOptions() {
@@ -924,6 +975,19 @@ document.addEventListener('click',async event => {
     }
   } else if (target.removeStaff) {
     await save({action:'staffRemove',email:target.removeStaff},null,button);
+  } else if (button.id === 'order-visibility') {
+    onlyOrdered = !onlyOrdered;
+    render();
+    document.querySelector('#order-visibility').focus();
+  } else if (Object.hasOwn(target,'orderEditor')) {
+    toggleOrderEditor(button);
+  } else if (target.orderCatalog) {
+    section = 'articles';
+    edit = target.orderCatalog;
+    render();
+    document.querySelector('#catalog input')?.focus();
+  } else if (target.markArticle) {
+    await pickOrderArticle(target.markArticle,false);
   } else if (target.pickArticle) {
     await pickOrderArticle(target.pickArticle);
   } else if (button.id === 'quick-toggle' || button.id === 'cancel-quick') {
@@ -937,12 +1001,13 @@ document.addEventListener('click',async event => {
   } else if (button.id === 'generate') {
     const pending = [...content.querySelectorAll('[data-edit-quantity]')].find(form => {
       const line = data.draft.lines[Number(form.dataset.editQuantity)];
-      return form.elements.quantity.valueAsNumber !== line.quantity || form.elements.unit.value !== line.unit;
+      return form.elements.quantity.valueAsNumber !== line.quantity || form.elements.unit.value !== line.unit || form.elements.supplier.value !== line.supplier;
     });
     if (pending) {
       notify('Desa els canvis de la línia abans de generar els missatges.',true);
       const line = data.draft.lines[Number(pending.dataset.editQuantity)];
-      (pending.elements.unit.value !== line.unit ? pending.elements.unit : pending.elements.quantity).focus();
+      if (pending.hidden) toggleOrderEditor(pending.previousElementSibling,false);
+      (pending.elements.supplier.value !== line.supplier ? pending.elements.supplier : pending.elements.quantity).focus();
       return;
     }
     await save({action:'order',revision:data.draft.revision}, result => {
@@ -1051,7 +1116,8 @@ document.addEventListener('submit',async event => {
       notify('La quantitat ha de ser un número més gran que zero.',true);
       return;
     }
-    await saveDraft(data.draft.lines.map((line,position) => position === index ? {...line,quantity,unit:values.unit} : line),event.submitter);
+    const lines = data.draft.lines.map((line,position) => position === index ? {...line,quantity,unit:values.unit,supplier:values.supplier} : line);
+    await saveDraft(combineDraftLines(lines),event.submitter);
   } else if (form.id === 'staff-access') {
     await save({action:'staffAdd',email:values.email},null,event.submitter);
   } else if (form.id === 'read-catalog') {
@@ -1073,18 +1139,21 @@ document.addEventListener('submit',async event => {
   } else if (form.id === 'offer') {
     await save({...values,action:'offer',article:edit},null,event.submitter);
   } else if (form.id === 'quick-article') {
+    let createdId;
     await save({...values,action:'quickArticle'},result => {
-      orderArticle = result.id;
+      createdId = result.id;
+      orderArticle = createdId;
       orderSearch = values.name.trim();
       showMatches = false;
       creatingArticle = false;
-    },event.submitter,()=>'Article creat. Ja el pots afegir a la comanda.');
+    },event.submitter,()=>'Article creat.');
+    if (createdId && byId('articles',createdId)) await addSelectedArticle();
   } else if (form.id === 'line' || form.id === 'catalog-line') {
     await addDraftLine(form,values,event.submitter);
   }
 });
 
-async function addDraftLine(form, values, button) {
+async function addDraftLine(form, values, button, focusLine = true) {
   const {article,supplier,unit} = values;
   const quantity = Number(values.quantity);
   const offer = data.offers.find(item => item.article_id === article && item.supplier_id === supplier);
@@ -1108,11 +1177,10 @@ async function addDraftLine(form, values, button) {
       showMatches = false;
     }
   },button,()=>'Article afegit a la comanda.',() => {
-    if (fromCatalog) return;
+    if (fromCatalog || !focusLine) return;
     const index = data.draft.lines.findIndex(matches);
-    const field = content.querySelector('[data-edit-quantity="'+index+'"] input');
-    field?.focus();
-    field?.select();
+    const pencil = content.querySelector('[data-order-editor="'+index+'"]');
+    if (pencil) toggleOrderEditor(pencil);
   });
 }
 
