@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>NexaTips</title>
+<link rel="icon" type="image/png" href="./icon.png?v=1.6.4">
+<link rel="apple-touch-icon" sizes="180x180" href="./icon.png?v=1.6.4">
+<style>:root{color-scheme:light;--bg:#f7f8fd;--tx:#28377e;--mu:#566598;--ln:#303f91;--surface:#fff;--soft:#f0f2fc;--border:#d4daf1;--field:#b6bfdf;--on:#fff;--red:#b42318;--green:#17734a}
+:root[data-theme=dark]{color-scheme:dark;--bg:#10152c;--tx:#e5e9ff;--mu:#adb8e5;--ln:#a1afff;--surface:#1b2447;--soft:#232f59;--border:#425080;--field:#6371a0;--on:#10152c;--red:#ff9992;--green:#84dbab}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:760px;margin:auto;padding:20px 16px 36px}
+header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:18px}
+h1{font-size:28px;letter-spacing:-.035em;margin:0}
+h2{font-size:21px;margin:0 0 14px}
+h3{font-size:17px;margin:0 0 8px}
+p{margin:8px 0}
+nav,.actions{display:flex;gap:8px;flex-wrap:wrap}
+nav{margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:0 3px 14px rgba(40,55,126,.055);padding:20px;margin-bottom:16px}
+label{display:grid;gap:4px;font-size:14px;color:var(--mu)}
+input,select,textarea{width:100%;min-height:46px;padding:8px 12px;border:1px solid var(--field);border-radius:10px;background:var(--surface);color:var(--tx);font:inherit;font-size:16px}
+textarea{display:block;resize:vertical;margin:10px 0}
+button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 15px;border:1px solid var(--ln);border-radius:10px;background:var(--surface);color:var(--tx);font:600 15px/1.3 inherit;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none}
+button:hover,.button:hover{background:var(--soft)}
+.primary,[aria-current=page]{background:var(--ln);color:var(--on)}
+.primary:hover,[aria-current=page]:hover{background:var(--ln);filter:brightness(1.13)}
+:focus-visible{outline:3px solid #788cf0;outline-offset:2px}
+button:disabled{opacity:.55;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.item{border-top:1px solid var(--border);padding:12px 0}
+.item:last-child{padding-bottom:0}
+.meta{color:var(--mu);font-size:14px}
+.error,.remove{color:var(--red)}
+#status:empty{display:none}
+#status{margin-bottom:12px}
+@media(max-width:430px){main{padding:14px 12px 28px}.card{padding:15px}h1{font-size:24px}nav button{padding:8px 11px}}
+[hidden]{display:none !important}
+.topbar{position:relative;gap:12px;padding-bottom:10px;border:0}
+.brand{min-width:0}
+.brand h1{font-size:clamp(20px,4.5vw,30px);line-height:1.1;overflow-wrap:anywhere}
+.version{margin-top:5px}
+.top-actions{display:flex;flex-shrink:0;gap:8px;align-items:center}
+.top-actions button{gap:7px;min-height:42px;padding:8px 12px;white-space:nowrap}
+.top-actions button span:first-child{font-size:18px;line-height:1}
+.menu-anchor{position:relative}
+#menu-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:5;width:192px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 30px rgba(40,55,126,.15);padding:10px}
+#tabs{display:grid;gap:6px;margin:0 0 6px}
+#menu-panel button{width:100%;justify-content:flex-start}
+@media(max-width:430px){
+  .topbar,.top-actions{gap:6px}
+  .top-actions button{font-size:14px;padding:7px 9px}
+  .version{font-size:13px}
+}
+main{width:100%;padding-inline:max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-right))}
+.card,.grid,.grid>* ,label,.row>*{min-width:0}
+input,select,textarea,button,.button{max-width:100%;min-width:0}
+.card{overflow-wrap:anywhere}
+.grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
+#login-panel{max-width:500px;margin-inline:auto}
+#login-form .grid{grid-template-columns:minmax(0,1fr)}
+.login-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#password-reset{display:inline-block;margin:12px 0;color:var(--tx);text-underline-offset:.18em}
+#login-status:empty{display:none}
+@media(max-width:480px){
+  html{-webkit-text-size-adjust:100%}
+  .topbar{align-items:flex-start;gap:8px;margin-bottom:8px;padding-bottom:4px}
+  .top-actions{gap:4px}
+  .top-actions #menu-toggle,.top-actions #logout{width:44px;min-height:44px;padding:0;border-color:transparent;background:transparent}
+  .top-actions .top-action-label{display:none}
+  .menu-anchor{position:static}
+  #menu-panel{top:100%;right:0;max-width:100%}
+  button,.button{touch-action:manipulation}
+}
+
+
+.tip-day{border-top:1px solid var(--border);padding:10px 0}
+.tip-day>summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px}
+.tip-day>summary strong:first-letter{text-transform:uppercase}
+.tip-day>summary::before{content:"+";font-weight:700}
+.tip-day[open]>summary::before{content:"−"}
+.tip-day>summary>strong{flex:1}
+.opening{display:flex;align-items:center;gap:8px;margin:8px 0 12px}
+.opening input{width:20px;min-height:20px;margin:0}
+.assignment{display:grid;grid-template-columns:minmax(0,1fr) minmax(96px, 125px) auto;align-items:center;gap:8px;margin:6px 0}
+.points-control{display:grid;grid-template-columns:minmax(0,1fr) 40px;align-items:stretch}
+.points-control input{padding-inline:8px;border-radius:10px 0 0 10px}
+.point-arrows{display:grid;grid-template-rows:repeat(2,minmax(25px,1fr))}
+.point-arrows button{min-height:0;padding:0;border-color:var(--field);border-left:0;border-radius:0 10px 0 0;line-height:1;touch-action:manipulation}
+.point-arrows button+button{border-top:0;border-radius:0 0 10px 0}
+.worker-state{display:block;color:var(--mu);font-size:14px}
+.worker-state.is-active{color:var(--green)}
+.add-worker{margin-top:12px}
+.result-meta{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.result-meta div{background:var(--soft);padding:10px 12px;border-radius:10px;display:grid}
+.result-meta span{color:var(--mu);font-size:14px}
+.result-meta strong{font-size:22px;font-variant-numeric:tabular-nums}
+.payout-list{padding:0;list-style:none}
+.payout-list li{display:grid;grid-template-columns:minmax(0,1fr) 3rem 6.5rem;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+.payout-list li strong{text-align:right}
+.worker-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px;margin-bottom:12px}
+.history-day{font-size:14px;padding:8px 0;border-top:1px solid var(--border)}
+.history-day p{margin:3px 0}
+
+[data-history-year][aria-pressed=true]{background:var(--ln);color:var(--on)}
+.annual-totals{list-style:none;padding:0;margin:0 0 20px}
+.annual-totals li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)}
+
+.worker-profiles .worker-profile-item{border-top:1px solid var(--border);padding:10px 0}
+.worker-profile-item>summary,.worker-profile-inactive>summary{cursor:pointer;min-height:34px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.worker-profile-item>summary::before,.worker-profile-inactive>summary::before{content:"+"}
+.worker-profile-item[open]>summary::before,.worker-profile-inactive[open]>summary::before{content:"−"}
+.worker-profile-item>summary strong,.worker-profile-inactive>summary strong{flex:1}
+.worker-profile-item>summary span,.worker-profile-inactive>summary span{color:var(--muted,var(--mu));font-size:14px}
+.worker-profile{padding:12px 0 4px}
+.worker-profile-fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));margin-bottom:12px}
+.worker-profile-option{display:flex;align-items:center;gap:8px;margin:10px 0}
+.worker-profile-option input{width:20px;height:20px;min-height:20px;margin:0;flex:none}
+.worker-profiles h3{margin-top:14px}
+
+.worker-contact-actions{margin-bottom:8px}
+.worker-contact-actions label{position:relative;cursor:pointer}
+.worker-contact-actions input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.worker-contact-actions label:focus-within{outline:3px solid #788cf0;outline-offset:2px}
+[data-worker-contact-options] label{margin-bottom:8px}
+
+.worker-contact-actions:empty{display:none}
+
+@media(max-width:480px){
+  .period-fields{grid-template-columns:minmax(0,1fr)}
+  .period-fields input{display:block;width:100%;min-width:0;max-width:100%;height:48px}
+}
+</style>
+<link rel="manifest" href="./manifest.webmanifest">
+</head>
+<body>
+<main>
+<header class="topbar">
+  <div class="brand"><h1>NexaTips</h1><div class="meta version">Versió 1.7.2<span id="sync-state" role="status"></span></div></div>
+  <div class="top-actions">
+    <div class="menu-anchor">
+      <button id="menu-toggle" type="button" aria-label="Menú" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">☰</span><span class="top-action-label" aria-hidden="true">Menú</span></button>
+      <div id="menu-panel" hidden>
+        <nav aria-label="Seccions" id="tabs"></nav>
+        <button id="theme" type="button" aria-pressed="false">Mode fosc</button>
+      </div>
+    </div>
+    <button id="logout" type="button" aria-label="Sortir" hidden><span aria-hidden="true">↪︎</span><span class="top-action-label" aria-hidden="true">Sortir</span></button>
+  </div>
+</header>
+<section id="login-panel" class="card">
+<h2>Inicia sessió</h2>
+<p id="login-status" role="status">Carregant l’accés…</p>
+<form id="login-form">
+<div class="grid">
+<label>Correu<input name="email" type="email" autocomplete="username" autocapitalize="none" required></label>
+<label>Contrasenya<input name="password" type="password" autocomplete="current-password" required></label>
+</div>
+<div class="login-actions">
+<button class="primary" value="login">Entra</button>
+<button class="primary" value="register">Crea un compte</button>
+</div>
+<a id="password-reset" href="#reset-panel">He oblidat la contrasenya</a></form>
+<details id="reset-panel" class="item" hidden>
+<summary>Restableix amb un enllaç del correu</summary>
+<form id="reset-link-form">
+<div class="grid">
+<label>Enllaç del correu de restabliment<input name="link" type="url" autocomplete="off" autocapitalize="none" required></label>
+<label>Contrasenya nova<input name="password" type="password" minlength="6" autocomplete="new-password" required></label>
+</div>
+<button class="primary">Desa la contrasenya nova</button>
+</form></details>
+<div class="actions" id="verify-actions" hidden>
+<button id="retry-login">Comprova l’accés</button>
+<button id="resend-verification">Torna a enviar el correu</button>
+</div>
+<form id="verify-link-form" class="item" hidden>
+<label>L’enllaç del correu dona error? Enganxa’l aquí<input name="link" type="url" autocomplete="off" autocapitalize="none" required></label>
+<button type="submit">Verifica el correu</button>
+</form></section>
+<div id="workspace" hidden>
+<p id="status" role="status"></p>
+<section id="content" aria-label="Contingut"></section>
+</div>
+</main>
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendEmailVerification, sendPasswordResetEmail, signOut, reload, checkActionCode, applyActionCode, verifyPasswordResetCode, confirmPasswordReset
+} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js';
+
+async function startStaffApp(apiOrigin, mountApp, apiPath = "/api") {
+  const panel = document.querySelector('#login-panel');
+  const form = document.querySelector('#login-form');
+  const message = document.querySelector('#login-status');
+  const actions = document.querySelector('#verify-actions');
+  const repair = document.querySelector('#verify-link-form');
+  const resetPanel = document.querySelector('#reset-panel');
+  const resetForm = document.querySelector('#reset-link-form');
+  const logout = document.querySelector('#logout');
+  const workspace = document.querySelector('#workspace');
+  let auth;
+  let mounted = false;
+  let busy = false;
+  const emailAction = new URL(location.href);
+  const incomingMode = emailAction.searchParams.get('mode');
+  let actionMode = ['verifyEmail','resetPassword'].includes(incomingMode) && emailAction.searchParams.get('oobCode') ? incomingMode : '';
+  if (actionMode) history.replaceState(null,'',location.pathname);
+
+  function show(text) {
+    message.textContent = text;
+  }
+
+  function errorMessage(error) {
+    switch (error.code) {
+      case 'auth/invalid-credential': return 'El correu o la contrasenya no són correctes.';
+      case 'auth/email-already-in-use': return 'Aquest correu ja té compte. Inicia sessió o restableix la contrasenya.';
+      case 'auth/weak-password': return 'Tria una contrasenya d’almenys sis caràcters.';
+      case 'auth/too-many-requests': return 'Massa intents. Torna-ho a provar més tard.';
+      default: return error.status ? error.message : 'No hi ha connexió amb el servei d’accés. Torna-ho a provar.';
+    }
+  }
+
+  async function request(body) {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw Object.assign(new Error('Torna a iniciar sessió.'),{status:401});
+    const headers = {Authorization:'Bearer '+token};
+    if (body) headers['Content-Type'] = 'application/json';
+    const response = await fetch(apiOrigin+apiPath,{method:body ? 'POST' : 'GET',headers,
+      body:body ? JSON.stringify(body) : undefined,cache:'no-store',credentials:'omit'});
+    const result = await response.json();
+    if (!response.ok) throw Object.assign(new Error(result.error),{status:response.status});
+    return result;
+  }
+
+  async function enter(user) {
+    form.hidden = Boolean(user);
+    resetPanel.hidden = Boolean(user);
+    actions.hidden = !user;
+    repair.hidden = !user || user.emailVerified;
+    logout.hidden = !user;
+    if (!user) {
+      show('');
+      return;
+    }
+    show('Comprovant l’accés…');
+    try {
+      const data = await request();
+      if (auth.currentUser?.uid !== user.uid || mounted) return;
+      mounted = true;
+      panel.hidden = true;
+      workspace.hidden = false;
+      mountApp(request,data);
+    } catch (error) {
+      document.querySelector('#resend-verification').hidden = user.emailVerified;
+      show(errorMessage(error));
+    }
+  }
+
+  async function withFeedback(operation) {
+    if (busy) return;
+    busy = true;
+    try { await operation(); }
+    catch (error) { show(errorMessage(error)); }
+    finally { busy = false; }
+  }
+
+  try {
+    const response = await fetch(apiOrigin+'/auth-config',{cache:'no-store',credentials:'omit'});
+    if (!response.ok) throw new Error('Firebase configuration unavailable');
+    // Keep the existing Firebase app key so sessions survive the rename.
+    auth = getAuth(initializeApp(await response.json(),'tracacomandes'));
+    auth.languageCode = 'ca';
+  } catch {
+    show('L’accés de l’equip no està disponible. Torna-ho a provar més tard.');
+    form.hidden = true;
+    resetPanel.hidden = true;
+    return;
+  }
+
+  const emailField = form.elements.email;
+  form.addEventListener('submit',event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      const email = emailField.value.trim();
+      const password = form.elements.password.value;
+      if (event.submitter?.value === 'register') {
+        const {user} = await createUserWithEmailAndPassword(auth,email,password);
+        await sendEmailVerification(user);
+        show('T’hem enviat un correu de verificació. Obre’l i torna aquí per continuar.');
+      } else {
+        await signInWithEmailAndPassword(auth,email,password);
+      }
+      form.reset();
+    });
+  });
+
+  function emailActionCode(value, mode) {
+    try {
+      const link = new URL(value.trim());
+      if (((link.origin === 'https://'+auth.app.options.authDomain && link.pathname === '/__/auth/action') ||
+           (link.origin === 'https://jninforner.github.io' && ['/NexaTips/','/NexaComandes/','/tracacomandes/'].includes(link.pathname))) && link.searchParams.get('mode') === mode) {
+        return link.searchParams.get('oobCode');
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  resetForm.addEventListener('submit',event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      const code = emailActionCode(resetForm.elements.link.value,'resetPassword');
+      if (!code) {
+        show('Enganxa l’enllaç complet del correu de restabliment de contrasenya de NexaTips.');
+        return;
+      }
+      try {
+        const email = await verifyPasswordResetCode(auth,code);
+        await confirmPasswordReset(auth,code,resetForm.elements.password.value);
+        resetForm.reset();
+        resetForm.elements.link.closest('label').hidden = false;
+        resetPanel.open = false;
+        if (actionMode) {
+          actionMode = '';
+          if (auth.currentUser) await signOut(auth);
+          await enter(null);
+        }
+        emailField.value = email;
+        form.elements.password.value = '';
+        form.elements.password.focus();
+        show('Contrasenya desada. Ja pots entrar amb la nova.');
+      } catch (error) {
+        resetForm.elements.password.value = '';
+        if (['auth/invalid-action-code','auth/expired-action-code'].includes(error.code)) {
+          show('Aquest enllaç ha caducat o ja s’ha utilitzat. Demana’n un de nou amb «He oblidat la contrasenya».');
+        } else {
+          throw error;
+        }
+      }
+    });
+  });
+
+  document.querySelector('#password-reset').onclick = event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      if (!emailField.reportValidity()) return;
+      await sendPasswordResetEmail(auth,emailField.value.trim());
+      show('Si existeix un compte amb aquest correu, rebràs un enllaç per restablir la contrasenya.');
+    });
+  };
+
+  document.querySelector('#retry-login').onclick = () => withFeedback(async () => {
+    if (!auth.currentUser) return;
+    await reload(auth.currentUser);
+    if (!auth.currentUser) return;
+    await auth.currentUser.getIdToken(true);
+    await enter(auth.currentUser);
+  });
+
+  document.querySelector('#resend-verification').onclick = () => withFeedback(async () => {
+    if (!auth.currentUser) return;
+    await sendEmailVerification(auth.currentUser);
+    show('T’hem tornat a enviar el correu de verificació.');
+  });
+
+  repair.addEventListener('submit',event => {
+    event.preventDefault();
+    void withFeedback(async () => {
+      const user = auth.currentUser;
+      if (!user && actionMode !== 'verifyEmail') return;
+      const code = emailActionCode(repair.elements.link.value,'verifyEmail');
+      if (!code) {
+        show('Enganxa l’enllaç complet del correu de verificació de NexaComandes.');
+        return;
+      }
+      try {
+        const info = await checkActionCode(auth,code);
+        if (info.operation !== 'VERIFY_EMAIL' || (user && actionMode !== 'verifyEmail' && info.data.email?.toLowerCase() !== user.email?.toLowerCase())) {
+          show('Aquest enllaç correspon a un altre compte.');
+          return;
+        }
+        await applyActionCode(auth,code);
+        repair.reset();
+        actionMode = '';
+        if (user && info.data.email?.toLowerCase() === user.email?.toLowerCase()) {
+          await reload(user);
+          await user.getIdToken(true);
+          await enter(user);
+        } else {
+          if (user) await signOut(auth);
+          await enter(null);
+          emailField.value = info.data.email || '';
+          show('Correu verificat. Ja pots iniciar sessió.');
+        }
+      } catch (error) {
+        if (['auth/invalid-action-code','auth/expired-action-code'].includes(error.code)) {
+          show('L’enllaç ha caducat o ja s’ha utilitzat. Prem «Comprova l’accés» o demana un correu nou.');
+        } else {
+          throw error;
+        }
+      }
+    });
+  });
+
+  logout.onclick = () => withFeedback(async () => {
+    await signOut(auth);
+    location.reload();
+  });
+
+  if (actionMode) {
+    form.hidden = true;
+    resetPanel.hidden = actionMode !== 'resetPassword';
+    resetPanel.open = !resetPanel.hidden;
+    repair.hidden = actionMode !== 'verifyEmail';
+    const current = resetPanel.hidden ? repair : resetForm;
+    current.elements.link.value = emailAction.href;
+    current.elements.link.closest('label').hidden = true;
+    show(actionMode === 'resetPassword' ? 'Tria una contrasenya nova.' : 'Prem el botó per confirmar el correu.');
+  }
+
+  onAuthStateChanged(auth,user => {
+    if (actionMode) return;
+    if (mounted && !user) location.reload();
+    else if (!mounted) void enter(user);
+  });
+}
+
+function mountHistoricalImport(request,state) {
+ const content=document.querySelector('#content');
+ if(state.role!=='admin'){content.textContent='Cal el compte d’administrador.';return;}
+ content.innerHTML='<section class="card"><h2>Importació de repartiments antics</h2><form><label>Còpies dels repartiments (JSON)<input type="file" name="backups" accept=".json,application/json" multiple required></label><button class="primary">Importa els repartiments</button></form><p role="status" id="import-status"></p></section>';
+ const form=content.querySelector('form'), status=content.querySelector('#import-status');
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  const button=form.querySelector('button');
+  button.disabled=true;
+  const files=[...form.elements.backups.files].sort((a,b)=>a.name.localeCompare(b.name));
+  try {
+   let total=0;
+   for(const file of files){
+    status.textContent='Important '+file.name+'…';
+    const result=await request({action:'importBackup',backup:JSON.parse(await file.text())});
+    total+=result.periods;
+   }
+   status.textContent='Importació completada: '+total+' repartiments nous.';
+  }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+ });
+}
+startStaffApp("https://comandes-cuina-mworkeza.shinyshrew16.chatgpt.site",mountHistoricalImport,"/NexaTips/api");
+</script></body></html>
