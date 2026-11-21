@@ -146,13 +146,17 @@ img,video,canvas{max-width:100%;height:auto}
 .order-lines .order-lookup{margin:14px 0 0}
 #order-add-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
 #order-add-search button{min-height:46px}
+
+.catalog-management{margin-bottom:10px}
+.article-merge-choice{display:flex;align-items:center;gap:5px;min-height:44px}
+.article-merge-choice input{width:18px;min-height:18px}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.8.2<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.9.0<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -434,6 +438,8 @@ let section = 'order';
 let edit = '';
 let categoryFilter = '';
 let supplierFilter = '';
+let archivedArticles = false;
+const mergeSelection = new Set();
 let addingArticle = '';
 let pdfReview;
 let readingPdf = false;
@@ -539,7 +545,9 @@ function catalog() {
     '<div class="actions"><button class="primary">Desa</button>'+(current ? '<button type="button" data-cancel>Cancel·la</button>' : '')+'</div></form></article>'+
     (section === 'articles' && current ? offerEditor(current) : '')+
     (isArticle ? pdfImportCard() : '')+
-    '<article class="card"><h2>'+sections[section]+'</h2>'+filters+'<div id="catalog-rows">'+
+    '<article class="card"><h2>'+sections[section]+'</h2>'+filters+(isArticle ?
+      '<div class="actions catalog-management"><button type="button" id="article-archive-view" aria-pressed="'+archivedArticles+'">'+(archivedArticles ? 'Mostra els articles actius' : 'Mostra els arxivats')+'</button></div>'+
+      '<div id="article-merge-controls">'+articleMergeControls()+'</div>' : '')+'<div id="catalog-rows">'+
     catalogRows()+'</div></article>';
 }
 
@@ -641,6 +649,15 @@ function draftArticleIds() {
 
 const draftBadge = '<span class="draft-badge">✓ A la comanda</span>';
 
+function articleMergeControls() {
+  const selected = data.articles.filter(article => mergeSelection.has(article.id));
+  if (!selected.length) return '';
+  return '<form id="merge-articles" class="item"><div class="grid"><label>Article que es conservarà<select name="target" required>'+
+    options(selected,'','Tria l’article principal')+'</select></label></div>'+
+    '<div class="actions"><button class="primary"'+(selected.length < 2 ? ' disabled' : '')+'>Fusiona '+selected.length+' articles</button>'+
+    '<button type="button" id="clear-article-merge">Desmarca tots</button></div></form>';
+}
+
 function catalogRows() {
   const isArticle = section === 'articles';
   const isSupplier = section === 'suppliers';
@@ -649,19 +666,25 @@ function catalogRows() {
   const names = {suppliers:'proveïdor',articles:'article',units:'unitat',categories:'categoria'};
   return data[section].filter(item => item.id !== pendingUnit).map(item => {
     const linked = isArticle ? data.offers.filter(offer => offer.article_id === item.id) : [];
-    if (isArticle && ((categoryFilter && (item.category_id || '-') !== categoryFilter) ||
+    if (isArticle && (Boolean(item.archived) !== archivedArticles || (categoryFilter && (item.category_id || '-') !== categoryFilter) ||
         (supplierFilter && !linked.some(offer => offer.supplier_id === supplierFilter)) || !searchKey(item.name).includes(query))) return '';
     const detail = isSupplier ? [item.contact,item.phone ? '+'+item.phone : 'Tria el contacte a WhatsApp'].filter(Boolean).join(' · ') :
       isArticle ? [byId('categories',item.category_id)?.name,byId('units',item.unit_id)?.name,
         linked.map(offer => byId('suppliers',offer.supplier_id)?.name).filter(Boolean).join(' · ') || 'Sense proveïdors'].filter(Boolean).join(' · ') : '';
     const browse = isSupplier || section === 'categories'
       ? '<button data-browse-articles="'+escape(item.id)+'">Mostra els articles</button>' : '';
-    const order = isArticle ? '<button data-add-article="'+escape(item.id)+'" aria-expanded="'+(addingArticle === item.id)+'"'+
+    const order = isArticle && !item.archived ? '<button data-add-article="'+escape(item.id)+'" aria-expanded="'+(addingArticle === item.id)+'"'+
       (linked.length ? '' : ' disabled')+'>Afegeix a la comanda</button>' : '';
     const inDraft = added?.has(item.id);
+    const articleActions = isArticle ?
+      '<button type="button" data-archive-article="'+escape(item.id)+'">'+(item.archived ? 'Restaura' : 'Arxiva')+'</button>'+
+      (inDraft || data.lines.some(line => line.article_id === item.id) ? '' :
+        '<button type="button" class="remove" data-delete-article="'+escape(item.id)+'">Elimina</button>') : '';
+    const select = isArticle ? '<label class="article-merge-choice"><input type="checkbox" data-merge-article="'+escape(item.id)+'"'+
+      (mergeSelection.has(item.id) ? ' checked' : '')+' aria-label="Selecciona '+escape(item.name)+' per fusionar"> Fusiona</label>' : '';
     return '<div class="item'+(inDraft ? ' in-draft' : '')+'"><div class="row"><div><strong>'+escape(item.name)+'</strong>'+
       (inDraft ? draftBadge : '')+(detail ? '<div class="meta">'+escape(detail)+'</div>' : '')+'</div><div class="actions">'+order+browse+
-      '<button data-edit="'+escape(item.id)+'">Edita</button></div></div>'+
+      '<button data-edit="'+escape(item.id)+'">Edita</button>'+articleActions+select+'</div></div>'+
       (isArticle && addingArticle === item.id ? catalogLine(item,linked) : '')+'</div>';
   }).join('') || empty('Cap '+names[section]+' per mostrar.');
 }
@@ -692,7 +715,7 @@ function offerEditor(article) {
 
 function orderMatches() {
   const query = searchKey(orderSearch);
-  return data.articles.filter(article => searchKey(article.name).includes(query));
+  return data.articles.filter(article => !article.archived && searchKey(article.name).includes(query));
 }
 
 function order() {
@@ -706,9 +729,9 @@ function order() {
     '<button id="cancel-quick" type="button">Cancel·la</button></div></form>' : '';
   const lookup = '<div class="order-lookup"><form id="order-add-search">'+
     '<label>Afegeix un article<input id="order-search" name="articleName" placeholder="Cerca pel nom" type="search" enterkeyhint="done" maxlength="120" required aria-controls="order-matches" autocomplete="off" value="'+escape(orderSearch)+'"></label>'+
-    '<button type="submit" class="primary">Fet</button></form>'+
+    '<button type="submit" id="order-search-submit" class="primary">Fet</button></form>'+
     '<div id="order-matches" class="order-matches" role="group" aria-label="Articles trobats" hidden></div>'+
-    '<p id="order-match-status" class="meta" role="status"></p>'+quickArticle+'</div>';
+    quickArticle+'</div>';
   return '<article class="card order-lines"><div class="order-list-heading"><div><h2>Nova comanda</h2>'+
     '<div class="meta">'+draftArticleIds().size+' de '+data.articles.length+' articles a la comanda</div></div>'+
     '<div class="order-list-filters"><label>Categoria<select id="order-category-filter">'+
@@ -727,7 +750,7 @@ function orderGroups(draft) {
   const byArticle = Map.groupBy(draft.filter(line => !orderSupplier || line.supplier === orderSupplier),line => line.article);
   const supplierArticles = new Set(data.offers.filter(offer => offer.supplier_id === orderSupplier).map(offer => offer.article_id));
   const articles = data.articles.filter(article =>
-    matchesOrderCategory(article) && (onlyOrdered ? byArticle.has(article.id) :
+    matchesOrderCategory(article) && (!article.archived || byArticle.has(article.id)) && (onlyOrdered ? byArticle.has(article.id) :
       !orderSupplier || supplierArticles.has(article.id) || byArticle.has(article.id)));
   const groups = Map.groupBy(articles,article => article.category_id || '');
   const sorted = [...groups].sort(([a],[b]) => categoryName(a).localeCompare(categoryName(b),'ca'));
@@ -800,8 +823,9 @@ function orderOptions() {
     return '<button type="button" data-pick-article="'+escape(article.id)+'"'+(inDraft ? ' class="in-draft"' : '')+'>'+escape(article.name)+
       (inDraft ? draftBadge : '')+(category ? '<span class="meta">'+escape(category)+'</span>' : '')+'</button>';
   }).join('');
-  document.querySelector('#order-match-status').textContent =
-    orderSearch.trim() && showMatches && !matches.length ? 'Prem Fet per crear aquest article.' : '';
+  const query = searchKey(orderSearch.trim());
+  const existing = query && data.articles.some(article => searchKey(article.name) === query);
+  document.querySelector('#order-search-submit').textContent = query && !existing ? 'Crea l’article' : 'Fet';
 }
 
 function orderDefaults(article) {
@@ -977,6 +1001,23 @@ document.addEventListener('click',async event => {
     const line = document.querySelector('#catalog-line');
     if (line) (line.elements.supplier.value ? line.elements.quantity : line.elements.supplier).focus();
     else [...content.querySelectorAll('[data-add-article]')].find(item => item.dataset.addArticle === article)?.focus();
+  } else if (button.id === 'article-archive-view') {
+    archivedArticles = !archivedArticles;
+    addingArticle = '';
+    render();
+    document.querySelector('#article-archive-view').focus();
+  } else if (button.id === 'clear-article-merge') {
+    mergeSelection.clear();
+    render();
+  } else if (target.archiveArticle || target.deleteArticle) {
+    const article = byId('articles',target.archiveArticle || target.deleteArticle);
+    if (!article) return;
+    if (target.deleteArticle && !window.confirm('Vols eliminar «'+article.name+'» del catàleg?')) return;
+    await save({action:target.deleteArticle ? 'deleteArticle' : 'archiveArticle',id:article.id,archived:!article.archived},() => {
+      if (edit === article.id) edit = '';
+      if (addingArticle === article.id) addingArticle = '';
+      if (target.deleteArticle) mergeSelection.delete(article.id);
+    },button,() => target.deleteArticle ? 'Article eliminat.' : article.archived ? 'Article restaurat.' : 'Article arxivat.');
   } else if (target.edit || Object.hasOwn(target,'cancel')) {
     edit = target.edit || '';
     render();
@@ -1041,6 +1082,13 @@ document.addEventListener('click',async event => {
 });
 
 document.addEventListener('change', async event => {
+  if (event.target.dataset.mergeArticle) {
+    const {mergeArticle} = event.target.dataset;
+    if (event.target.checked) mergeSelection.add(mergeArticle);
+    else mergeSelection.delete(mergeArticle);
+    document.querySelector('#article-merge-controls').innerHTML = articleMergeControls();
+    return;
+  }
   if (event.target.matches('#order-category-filter, #order-supplier-filter')) {
     if (event.target.id === 'order-category-filter') orderCategory = event.target.value;
     else orderSupplier = event.target.value;
@@ -1119,7 +1167,17 @@ document.addEventListener('submit',async event => {
   if (!form.closest('#workspace')) return;
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form));
-  if (form.id === 'order-add-search') {
+  if (form.id === 'merge-articles') {
+    const target = byId('articles',values.target);
+    const sources = [...mergeSelection].filter(id => id !== values.target);
+    if (!target || !mergeSelection.has(target.id) || !sources.length) return;
+    if (!window.confirm('Vols fusionar '+sources.length+' articles amb «'+target.name+'»? Es conservarà l’històric.')) return;
+    await save({action:'mergeArticles',id:target.id,sources},() => {
+      mergeSelection.clear();
+      addingArticle = '';
+      edit = target.id;
+    },event.submitter,()=>'Articles fusionats.');
+  } else if (form.id === 'order-add-search') {
     if (busy || !values.articleName.trim()) return;
     orderSearch = values.articleName.trim();
     const matches = orderMatches().filter(article => searchKey(article.name) === searchKey(orderSearch));
@@ -1129,6 +1187,8 @@ document.addEventListener('submit',async event => {
       showMatches = true;
       orderOptions();
       document.querySelector('#order-matches button')?.focus();
+    } else if (data.articles.some(article => article.archived && searchKey(article.name) === searchKey(orderSearch))) {
+      notify('Aquest article és a Articles → Mostra els arxivats. Restaura’l per afegir-lo.',true);
     } else {
       creatingArticle = true;
       showMatches = false;
