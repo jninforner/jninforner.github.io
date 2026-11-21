@@ -142,13 +142,17 @@ img,video,canvas{max-width:100%;height:auto}
 #order-dialog{width:min(460px,calc(100% - 24px));max-height:calc(100% - 24px);padding:18px;color:var(--tx);background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow-wrap:anywhere}
 #order-dialog::backdrop{background:#11183180}
 #order-dialog .order-editor{padding:0}
+
+.order-lines .order-lookup{margin:14px 0 0}
+#order-add-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+#order-add-search button{min-height:46px}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.6.2<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.6.3<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -693,24 +697,24 @@ function order() {
   const draft = data.draft.lines;
   const quickArticle = creatingArticle ? '<form id="quick-article" class="item"><h3>Nou article</h3><div class="grid">'+
     '<label>Nom<input name="name" required maxlength="120" value="'+escape(orderSearch.trim())+'"></label>'+
-    '<label>Categoria<select name="category">'+options(data.categories,'','Sense categoria')+'</select></label>'+
+    '<label>Categoria<select name="category">'+options(data.categories,orderCategory,'Sense categoria')+'</select></label>'+
     '<label>Proveïdor<select name="supplier" required>'+options(data.suppliers,'','Tria un proveïdor')+'</select></label>'+
     '<label>Unitat de compra<select name="unit" required>'+options(purchaseUnits(),'','Tria una unitat')+'</select></label></div>'+
-    '<div class="actions">'+(data.suppliers.length ? '<button class="primary">Crea l’article</button>' : '<button type="button" data-tab="suppliers">Dona d’alta un proveïdor</button>')+
+    '<div class="actions">'+(data.suppliers.length ? '<button class="primary">Crea i afegeix a la comanda</button>' : '<button type="button" data-tab="suppliers">Dona d’alta un proveïdor</button>')+
     '<button id="cancel-quick" type="button">Cancel·la</button></div></form>' : '';
-  return '<article class="card"><h2>Nova comanda</h2>'+
-    '<div class="order-lookup"><label>Afegeix un article<input id="order-search" placeholder="Cerca pel nom" type="search" aria-controls="order-matches" autocomplete="off" value="'+escape(orderSearch)+'"></label>'+
+  const lookup = '<div class="order-lookup"><form id="order-add-search">'+
+    '<label>Afegeix un article<input id="order-search" name="articleName" placeholder="Cerca pel nom" type="search" enterkeyhint="done" maxlength="120" required aria-controls="order-matches" autocomplete="off" value="'+escape(orderSearch)+'"></label>'+
+    '<button type="submit" class="primary">Fet</button></form>'+
     '<div id="order-matches" class="order-matches" role="group" aria-label="Articles trobats" hidden></div>'+
-    '<p id="order-match-status" class="meta" role="status"></p></div>'+
-    '<div class="actions"><button id="quick-toggle" aria-expanded="'+creatingArticle+'">＋ Crea un article</button></div>'+quickArticle+
-    '</article><article class="card order-lines"><div class="order-list-heading"><div><h2>Llista de la comanda</h2>'+
+    '<p id="order-match-status" class="meta" role="status"></p>'+quickArticle+'</div>';
+  return '<article class="card order-lines"><div class="order-list-heading"><div><h2>Nova comanda</h2>'+
     '<div class="meta">'+draftArticleIds().size+' de '+data.articles.length+' articles a la comanda</div></div>'+
     '<div class="order-list-filters"><label>Categoria<select id="order-category-filter">'+
     options([...data.categories].sort((a,b) => a.name.localeCompare(b.name,'ca')).concat(
       data.articles.some(article => !article.category_id) ? [{id:'uncategorized',name:'Sense categoria'}] : []),
       orderCategory,'Totes les categories')+'</select></label>'+
     '<button type="button" id="order-visibility" aria-pressed="'+onlyOrdered+'"><span aria-hidden="true">👁︎</span> Només la comanda</button></div></div>'+
-    '<div id="order-groups">'+orderGroups(draft)+'</div>'+
+    lookup+'<div id="order-groups">'+orderGroups(draft)+'</div>'+
     (draft.length ? '<div class="actions order-send"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+
     '</article><dialog id="order-dialog" aria-labelledby="order-dialog-title"></dialog>';
 }
@@ -791,9 +795,7 @@ function orderOptions() {
       (inDraft ? draftBadge : '')+(category ? '<span class="meta">'+escape(category)+'</span>' : '')+'</button>';
   }).join('');
   document.querySelector('#order-match-status').textContent =
-    orderSearch.trim() && !matches.length ? 'Cap article coincideix amb la cerca. Pots crear-lo amb «Crea un article».' : '';
-  document.querySelector('#quick-toggle').hidden = creatingArticle ||
-    matches.some(article => searchKey(article.name) === searchKey(orderSearch));
+    orderSearch.trim() && showMatches && !matches.length ? 'Prem Fet per crear aquest article.' : '';
 }
 
 function orderDefaults(article) {
@@ -996,10 +998,10 @@ document.addEventListener('click',async event => {
     await pickOrderArticle(target.markArticle,button);
   } else if (target.pickArticle) {
     await pickOrderArticle(target.pickArticle,button);
-  } else if (button.id === 'quick-toggle' || button.id === 'cancel-quick') {
-    creatingArticle = !creatingArticle;
+  } else if (button.id === 'cancel-quick') {
+    creatingArticle = false;
     render();
-    document.querySelector(creatingArticle ? '#quick-article input' : '#order-search').focus();
+    document.querySelector('#order-search').focus();
   } else if (target.unlink) {
     await save({action:'unlink',article:edit,supplier:target.unlink},null,button);
   } else if (Object.hasOwn(target,'remove')) {
@@ -1091,12 +1093,11 @@ document.addEventListener('input', event => {
 });
 
 document.addEventListener('keydown', event => {
-  if (event.target.id !== 'order-search' || !['ArrowDown','Enter'].includes(event.key)) return;
+  if (event.target.id !== 'order-search' || event.key !== 'ArrowDown') return;
   const first = document.querySelector('#order-matches button');
   if (!first) return;
   event.preventDefault();
-  if (event.key === 'Enter') pickOrderArticle(first.dataset.pickArticle);
-  else first.focus();
+  first.focus();
 });
 
 document.addEventListener('submit',async event => {
@@ -1104,7 +1105,23 @@ document.addEventListener('submit',async event => {
   if (!form.closest('#workspace')) return;
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form));
-  if (Object.hasOwn(form.dataset,'orderRecipient')) {
+  if (form.id === 'order-add-search') {
+    if (busy || !values.articleName.trim()) return;
+    orderSearch = values.articleName.trim();
+    const matches = orderMatches().filter(article => searchKey(article.name) === searchKey(orderSearch));
+    if (matches.length === 1) {
+      await pickOrderArticle(matches[0].id,event.submitter);
+    } else if (matches.length > 1) {
+      showMatches = true;
+      orderOptions();
+      document.querySelector('#order-matches button')?.focus();
+    } else {
+      creatingArticle = true;
+      showMatches = false;
+      render();
+      document.querySelector('#quick-article select[name=supplier]').focus();
+    }
+  } else if (Object.hasOwn(form.dataset,'orderRecipient')) {
     await openOrderRecipient(form,event.submitter);
   } else if (Object.hasOwn(form.dataset,'editQuantity')) {
     const index = form.dataset.editQuantity;
@@ -1176,6 +1193,7 @@ async function addDraftLine(values, button, fromCatalog = false) {
       if (showMatches && !matchesOrderCategory(byId('articles',article))) orderCategory = '';
       orderSearch = '';
       showMatches = false;
+      creatingArticle = false;
     }
   },button,()=>'Article afegit a la comanda.');
 }
