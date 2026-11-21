@@ -133,13 +133,17 @@ img,video,canvas{max-width:100%;height:auto}
 .order-pencil{width:44px;padding:0;font-size:21px}
 .order-editor{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;padding:8px 10px 12px}
 .order-editor label:nth-child(3),.order-editor .actions{grid-column:1/-1}
+
+.order-list-filters{display:flex;flex-wrap:wrap;align-items:end;gap:8px;min-width:0}
+.order-list-filters label{width:min(100%,14rem)}
+.order-list-filters select{height:44px;min-height:44px}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.6.0<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.6.1<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -427,6 +431,7 @@ let articleSearch = '';
 let openOrder = '';
 let orderArticle = '';
 let onlyOrdered = false;
+let orderCategory = '';
 let orderSearch = '';
 let showMatches = true;
 let creatingArticle = false;
@@ -695,14 +700,19 @@ function order() {
     '</div><p id="order-supplier-status" class="meta"></p><button id="add-line">Afegeix la línia</button></form>'+
     '</article><article class="card order-lines"><div class="order-list-heading"><div><h2>Llista de la comanda</h2>'+
     '<div class="meta">'+draftArticleIds().size+' de '+data.articles.length+' articles a la comanda</div></div>'+
-    '<button type="button" id="order-visibility" aria-pressed="'+onlyOrdered+'"><span aria-hidden="true">👁︎</span> Només la comanda</button></div>'+
+    '<div class="order-list-filters"><label>Categoria<select id="order-category-filter">'+
+    options([...data.categories].sort((a,b) => a.name.localeCompare(b.name,'ca')).concat(
+      data.articles.some(article => !article.category_id) ? [{id:'uncategorized',name:'Sense categoria'}] : []),
+      orderCategory,'Totes les categories')+'</select></label>'+
+    '<button type="button" id="order-visibility" aria-pressed="'+onlyOrdered+'"><span aria-hidden="true">👁︎</span> Només la comanda</button></div></div>'+
     (draft.length ? '<div class="actions order-send"><button class="primary" id="generate">Desa i genera els missatges</button></div>' : '')+
-    orderGroups(draft)+'</article>';
+    '<div id="order-groups">'+orderGroups(draft)+'</div></article>';
 }
 
 function orderGroups(draft) {
   const byArticle = Map.groupBy(draft,line => line.article);
-  const articles = data.articles.filter(article => !onlyOrdered || byArticle.has(article.id));
+  const articles = data.articles.filter(article =>
+    (!onlyOrdered || byArticle.has(article.id)) && matchesOrderCategory(article));
   const groups = Map.groupBy(articles,article => article.category_id || '');
   const sorted = [...groups].sort(([a],[b]) => categoryName(a).localeCompare(categoryName(b),'ca'));
   return sorted.map(([category,items]) =>
@@ -710,7 +720,12 @@ function orderGroups(draft) {
     items.map(article => {
       const lines = byArticle.get(article.id);
       return lines ? lines.map(line => orderListRow(article,line,draft.indexOf(line))).join('') : orderListRow(article);
-    }).join('')+'</section>').join('') || empty(onlyOrdered ? 'Encara no hi ha cap article a la comanda.' : 'El catàleg és buit.');
+    }).join('')+'</section>').join('') || empty(orderCategory ? 'No hi ha articles visibles en aquesta categoria.' :
+      onlyOrdered ? 'Encara no hi ha cap article a la comanda.' : 'El catàleg és buit.');
+}
+
+function matchesOrderCategory(article) {
+  return !orderCategory || (article?.category_id || 'uncategorized') === orderCategory;
 }
 
 function categoryName(id) {
@@ -1031,6 +1046,11 @@ document.addEventListener('click',async event => {
 });
 
 document.addEventListener('change', async event => {
+  if (event.target.id === 'order-category-filter') {
+    orderCategory = event.target.value;
+    document.querySelector('#order-groups').innerHTML = orderGroups(data.draft.lines);
+    return;
+  }
   if (event.target.matches('[data-contact-choice] select')) {
     event.target.form.elements.phone.value = event.target.value ? '+'+event.target.value : '';
     return;
@@ -1172,6 +1192,7 @@ async function addDraftLine(form, values, button, focusLine = true) {
     if (fromCatalog) {
       addingArticle = '';
     } else {
+      if (focusLine && !matchesOrderCategory(byId('articles',article))) orderCategory = '';
       orderArticle = '';
       orderSearch = '';
       showMatches = false;
