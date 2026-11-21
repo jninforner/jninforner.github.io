@@ -150,19 +150,22 @@ img,video,canvas{max-width:100%;height:auto}
 .catalog-management{margin-bottom:10px}
 .article-merge-choice{display:flex;align-items:center;gap:5px;min-height:44px}
 .article-merge-choice input{width:18px;min-height:18px}
+
+.staff-worker summary{cursor:pointer}
+.staff-worker form{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:8px 0}
+.staff-worker form label{flex:1 1 14rem}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.9.0<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.9.1<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
       <div id="menu-panel" hidden>
         <nav aria-label="Seccions" id="tabs"></nav>
-        <a class="button" href="https://comandes-cuina-mworkeza.shinyshrew16.chatgpt.site/NexaTips/">NexaTips</a>
         <button id="theme" type="button" aria-pressed="false">Mode fosc</button>
       </div>
     </div>
@@ -945,15 +948,24 @@ async function openOrderRecipient(form, button) {
 }
 
 function staff() {
-  return '<article class="card"><h2>Accés de l’equip</h2>'+
-    '<p class="meta">Ets l’administrador de NexaComandes. Pots autoritzar usuaris i retirar-los l’accés.</p>'+
-    '<form id="staff-access"><div class="grid"><label>Treballador de NexaTips<select name="worker" required><option value="">Tria una persona</option>'+
-    (data.tipWorkers ?? []).slice().sort((a,b) => a.name.localeCompare(b.name,'ca')).map(person =>
-      '<option value="'+escape(person.id)+'">'+escape(person.name)+'</option>').join('')+
-    '</select></label><label>Correu del treballador<input type="email" name="email" autocomplete="off" required></label></div>'+
-    '<button class="primary">Autoritza</button></form>'+
-    (data.staff.map(person => '<div class="row item"><span>'+(person.name ? escape(person.name)+' · ' : '')+escape(person.email)+'</span><button data-remove-staff="'+escape(person.email)+'">Retira l’accés</button></div>').join('') ||
-      empty('Encara no hi ha treballadors autoritzats.'))+'</article>';
+  const roster = [...(data.tipWorkers ?? [])].sort((a,b) => a.name.localeCompare(b.name,'ca'));
+  const permissions = new Map(data.staff.map(person => [person.worker_id,person]));
+  const revoke = person => '<button type="button" data-remove-staff="'+escape(person.email)+'">Retira l’accés</button>';
+  const workers = roster.map(worker => {
+    const person = permissions.get(worker.id);
+    const name = escape(worker.name);
+    if (person) return '<div class="row item"><div><strong>'+name+'</strong><div class="meta">'+
+      escape(person.email)+' · Accés autoritzat</div></div>'+revoke(person)+'</div>';
+    return '<details class="item staff-worker"><summary><strong>'+name+'</strong> <span class="meta">· Sense accés</span></summary>'+
+      '<form data-staff-access><input type="hidden" name="worker" value="'+escape(worker.id)+'">'+
+      '<label>Correu de '+name+'<input type="email" name="email" autocomplete="off" required></label>'+
+      '<button class="primary">Autoritza l’accés</button></form></details>';
+  }).join('');
+  const unlinked = data.staff.filter(person => !roster.some(worker => worker.id === person.worker_id));
+  return '<article class="card"><h2>Equip</h2><p class="meta">Gestiona l’accés a NexaComandes des de la fitxa de cada treballador.</p>'+
+    (workers || empty('Encara no hi ha treballadors al registre compartit.'))+
+    (unlinked.length ? '<h3 class="item">Accessos sense fitxa vinculada</h3>'+unlinked.map(person =>
+      '<div class="row item"><span>'+escape(person.email)+'</span>'+revoke(person)+'</div>').join('') : '')+'</article>';
 }
 
 function render() {
@@ -1213,7 +1225,7 @@ document.addEventListener('submit',async event => {
     }
     const lines = data.draft.lines.map((line,position) => position === Number(index) ? {...line,quantity,unit:values.unit,supplier:values.supplier} : line);
     await saveDraft(combineDraftLines(lines),event.submitter);
-  } else if (form.id === 'staff-access') {
+  } else if (Object.hasOwn(form.dataset,'staffAccess')) {
     await save({action:'staffAdd',worker:values.worker,email:values.email},null,event.submitter);
   } else if (form.id === 'read-catalog') {
     await analyzeCatalog(form,event.submitter);
