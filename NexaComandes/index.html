@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>NexaComandes</title>
-<link rel="icon" type="image/png" href="./icon.png">
-<link rel="apple-touch-icon" sizes="180x180" href="./icon.png">
+<link rel="icon" type="image/png" href="./icon.png?v=1.11.2">
+<link rel="apple-touch-icon" sizes="180x180" href="./icon.png?v=1.11.2">
 <style>:root{color-scheme:light;--bg:#f7f8fd;--tx:#28377e;--mu:#566598;--ln:#303f91;--surface:#fff;--soft:#f0f2fc;--border:#d4daf1;--field:#b6bfdf;--on:#fff;--red:#b42318;--green:#17734a}
 :root[data-theme=dark]{color-scheme:dark;--bg:#10152c;--tx:#e5e9ff;--mu:#adb8e5;--ln:#a1afff;--surface:#1b2447;--soft:#232f59;--border:#425080;--field:#6371a0;--on:#10152c;--red:#ff9992;--green:#84dbab}
 *{box-sizing:border-box}
@@ -151,10 +151,6 @@ img,video,canvas{max-width:100%;height:auto}
 .article-merge-choice{display:flex;align-items:center;gap:5px;min-height:44px}
 .article-merge-choice input{width:18px;min-height:18px}
 
-.staff-worker summary{cursor:pointer}
-.staff-worker form{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:8px 0}
-.staff-worker form label{flex:1 1 14rem}
-
 .worker-profiles .worker-profile-item{border-top:1px solid var(--border);padding:10px 0}
 .worker-profile-item>summary,.worker-profile-inactive>summary{cursor:pointer;min-height:34px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .worker-profile-item>summary::before,.worker-profile-inactive>summary::before{content:"+"}
@@ -178,7 +174,7 @@ img,video,canvas{max-width:100%;height:auto}
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.11.0<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaComandes</h1><div class="meta version">Versió 1.11.2<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">≡</span> Menú</button>
@@ -402,9 +398,15 @@ function vCardContact(text) {
   const entries = text.replace(/\r?\n[ \t]/g,'').split(/\r?\n/);
   if (entries.filter(line => /^BEGIN:VCARD$/i.test(line.trim())).length !== 1) return null;
   const values = field => entries.filter(line =>
-    new RegExp('^(?:[\\w-]+\\.)?'+field+'(?:;[^:]*)?:','i').test(line)).map(line =>
-    line.slice(line.indexOf(':')+1).replace(/\\[nN]/g,' ').replace(/\\([,;\\])/g,'$1').trim());
-  return {name:values('FN')[0] || '',email:values('EMAIL'),tel:values('TEL').map(value => value.replace(/^tel:/i,''))};
+    new RegExp('^(?:[\\w-]+\\.)?'+field+'(?:;[^:]*)?:','i').test(line)
+  ).map(line => line.slice(line.indexOf(':')+1)
+    .replace(/\\[nN]/g,' ').replace(/\\([,;\\])/g,'$1').trim()).filter(Boolean);
+  return {
+    name:values('FN')[0] ?? '',
+    tel:values('TEL').map(value => value.replace(/^tel:/i,'')),
+    email:values('EMAIL').map(value => value.replace(/^mailto:/i,'')),
+    uid:values('UID')[0] ?? ''
+  };
 }
 
 function combineDraftLines(lines) {
@@ -428,7 +430,10 @@ function renderWorkerProfiles(workers, escapeHtml) {
     '<div class="actions worker-contact-actions">'+
     (typeof navigator.contacts?.select === 'function' ? '<button type="button" data-worker-contact>Tria de l’agenda</button>' : '')+
     '<label class="button">Importa contacte Apple (.vcf)<input type="file" accept=".vcf,text/vcard,text/x-vcard" data-worker-vcard></label></div>'+
-    '<div data-worker-contact-options></div><p class="meta" data-worker-contact-status role="status" hidden></p>'+
+    '<input type="hidden" name="contactName" value="'+escapeHtml(worker?.contactName ?? '')+'">'+
+    '<input type="hidden" name="contactUid" value="'+escapeHtml(worker?.contactUid ?? '')+'">'+
+    '<div data-worker-contact-options></div><p class="meta" data-worker-contact-status role="status" '+(worker?.contactName ? '' : 'hidden')+'>'+
+    (worker?.contactName ? 'Contacte associat: '+escapeHtml(worker.contactName) : '')+'</p>'+
     '<div class="worker-profile-fields">'+
     '<label>Nom<input name="name" maxlength="80" value="'+escapeHtml(worker?.name ?? '')+'" required></label>'+
     '<label>Correu<input name="email" type="email" maxlength="254" value="'+escapeHtml(worker?.email ?? '')+'"></label>'+
@@ -452,7 +457,8 @@ function renderWorkerProfiles(workers, escapeHtml) {
 function workerProfilePayload(form) {
   const fields = form.elements;
   return {action:'workerProfile',id:form.dataset.workerProfile,name:fields.name.value,email:fields.email.value,
-    phone:fields.phone.value,active:fields.active.checked,tipsView:fields.tipsView.checked};
+    phone:fields.phone.value,active:fields.active.checked,tipsView:fields.tipsView.checked,
+    contactName:fields.contactName.value,contactUid:fields.contactUid.value};
 }
 
 
@@ -465,6 +471,15 @@ function bindWorkerContacts(container) {
     status.hidden = !text;
   }
 
+  function setWorkerContactField(form, field, value) {
+    const fields = form.elements;
+    if (field === 'email' && value.toLowerCase() !== fields.email.value.trim().toLowerCase() && fields.tipsView.checked) {
+      fields.tipsView.checked = false;
+      return true;
+    }
+    return false;
+  }
+
   function fillWorkerContact(form, contact) {
     const fields = form.elements;
     if (contact.name && !form.dataset.workerProfile) fields.name.value = contact.name.trim().slice(0,80);
@@ -473,9 +488,13 @@ function bindWorkerContacts(container) {
       ['phone','Telèfon',contact.tel || [],48]
     ];
     const choices = document.createDocumentFragment();
+    let reviewAccess = false;
     for (const [field,label,values,limit] of groups) {
       const options = [...new Set(values.map(value => value.trim().slice(0,limit)).filter(Boolean))];
-      if (options.length === 1) fields[field].value = options[0];
+      if (options.length === 1) {
+        if (setWorkerContactField(form,field,options[0])) reviewAccess = true;
+        fields[field].value = options[0];
+      }
       if (options.length < 2) continue;
       const select = document.createElement('select');
       select.dataset.workerContactField = field;
@@ -488,7 +507,10 @@ function bindWorkerContacts(container) {
     const panel = form.querySelector('[data-worker-contact-options]');
     panel.querySelectorAll('label:has([data-worker-contact-field])').forEach(label => label.remove());
     panel.append(choices);
-    updateContactStatus(form,'Revisa les dades del contacte i desa la fitxa.');
+    fields.contactName.value = (contact.name || contact.email?.[0] || contact.tel?.[0] || '').slice(0,160);
+    fields.contactUid.value = contact.uid ?? '';
+    updateContactStatus(form,'Revisa les dades del contacte i desa la fitxa.'+
+      (reviewAccess ? ' Revisa si vols autoritzar el correu nou a NexaTips.' : ''));
   }
 
   container.addEventListener('click',async event => {
@@ -508,7 +530,10 @@ function bindWorkerContacts(container) {
   container.addEventListener('change',async event => {
     const input = event.target;
     if (input.matches('[data-worker-contact-field]') && input.value) {
-      input.form.elements[input.dataset.workerContactField].value = input.value;
+      const field = input.dataset.workerContactField;
+      if (setWorkerContactField(input.form,field,input.value))
+        updateContactStatus(input.form,'Revisa si vols autoritzar el correu nou a NexaTips abans de desar.');
+      input.form.elements[field].value = input.value;
     } else if (input.matches('[data-worker-contact-choice]') && input.value) {
       const contact = contactsByForm.get(input.form)?.[Number(input.value)];
       if (contact) fillWorkerContact(input.form,contact);
