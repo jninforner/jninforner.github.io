@@ -139,7 +139,7 @@ input,select,textarea,button,.button{max-width:100%;min-width:0}
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaTips</h1><div class="meta version">Versió 1.7.3<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaTips</h1><div class="meta version">Versió 1.8.0<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-label="Menú" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">☰</span><span class="top-action-label" aria-hidden="true">Menú</span></button>
@@ -223,8 +223,23 @@ function distribute(cents, days) {
   return {units: Number(units) / pointScale, payouts: payouts.map(({remainder, ...row}) => row)};
 }
 
-function periodDays(date, previous, workers) {
-  const start = previous ? shiftDay(previous.date, 1) : shiftDay(date, -6);
+const sundayOnOrAfter = date => shiftDay(date,(7-weekday(date))%7);
+const periodLength = (start,date) => (+dayOf(date)-+dayOf(start))/dayMs+1;
+
+function validPeriodRange(start, date, previousDate) {
+  return validDay(start) && validDay(date) && start <= date &&
+    (!previousDate || start > previousDate) && periodLength(start,date) <= 366;
+}
+
+function defaultPeriodDates(today, previousDate) {
+  const upcoming = sundayOnOrAfter(today);
+  if (!previousDate) return {start:shiftDay(upcoming,-6),date:upcoming};
+  const start = shiftDay(previousDate,1);
+  const date = upcoming >= start && periodLength(start,upcoming) <= 366 ? upcoming : sundayOnOrAfter(start);
+  return {start,date};
+}
+
+function periodDays(date, previous, workers, start = previous ? shiftDay(previous.date,1) : shiftDay(date,-6)) {
   const template = new Map(previous?.days.map(day => [weekday(day.date), day]));
   const active = new Set(workers.filter(worker => worker.active).map(worker => worker.id));
   const days = [];
@@ -576,8 +591,6 @@ function mountTipsViewer(request, initial) {
   render(initial.current);
 }
 
-
-
 async function mountApp(request = localRequest, initial) {
   const content = get('content');
   const status = get('status');
@@ -598,11 +611,11 @@ async function mountApp(request = localRequest, initial) {
   const today = new Intl.DateTimeFormat('en-CA', {
     timeZone:'Europe/Madrid', year:'numeric', month:'2-digit', day:'2-digit'
   }).format(new Date());
-  const upcoming = shiftDay(today, (7 - weekday(today)) % 7);
   let tab = 'period';
   let historyYear;
   const workerChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('nexa-worker-profiles') : null;
   let date;
+  let start;
   let days;
   let amount = '';
   let busy = false;
@@ -616,18 +629,17 @@ async function mountApp(request = localRequest, initial) {
   const collator = new Intl.Collator('ca', {sensitivity:'base'});
   const sortedWorkers = () => data.workers.slice().sort((a, b) => collator.compare(a.name, b.name));
   const activeWorkers = () => sortedWorkers().filter(worker => worker.active);
-  const firstSunday = () => latest() ? shiftDay(latest().date, 7) : '';
+  const earliestStart = () => latest() ? shiftDay(latest().date,1) : '';
   function resetPeriod() {
-    date = upcoming >= firstSunday() ? upcoming : firstSunday();
-    const next = latest() && (+dayOf(date) - +dayOf(latest().date)) / dayMs > 366 ? firstSunday() : date;
-    date = next;
-    days = periodDays(date, latest(), data.workers);
+    ({start,date} = defaultPeriodDates(today,latest()?.date));
+    days = periodDays(date,latest(),data.workers,start);
     selectedDays = new Set();
     amount = '';
   }
   resetPeriod();
   if (data.draft) {
     ({date, days, amount} = data.draft);
+    start = data.draft.start ?? days[0].date;
     const active = new Set(activeWorkers().map(worker => worker.id));
     for (const day of days) day.entries = day.entries.filter(row => active.has(row.id));
     sync.textContent = ' · Esborrany recuperat';
@@ -659,7 +671,7 @@ async function mountApp(request = localRequest, initial) {
   }
 
   function queueDraft() {
-    pendingDraft = structuredClone({date, days, amount, previousDate:latest()?.date ?? null});
+    pendingDraft = structuredClone({start, date, days, amount, previousDate:latest()?.date ?? null});
     void saveDraft();
   }
 
@@ -737,7 +749,8 @@ async function mountApp(request = localRequest, initial) {
       '<button type="button" data-tab="'+key+'" '+(tab === key ? 'aria-current="page"' : '')+'>'+label+'</button>').join('');
     if (tab === 'period') {
       content.innerHTML = '<section class="card"><h2>Repartiment</h2><div class="grid period-fields">'+
-        '<label>Diumenge del repartiment<input id="period-date" type="date" value="'+date+'" min="'+firstSunday()+'"></label>'+
+        '<label>Data inicial<input id="period-start" type="date" value="'+start+'" min="'+earliestStart()+'"></label>'+
+        '<label>Data final<input id="period-date" type="date" value="'+date+'" min="'+start+'"></label>'+
         '<label>Pot de propines (€)<input id="amount" type="text" inputmode="decimal" maxlength="32" placeholder="0,00" value="'+escapeHtml(amount)+'"></label></div></section>'+
         '<section class="card"><h2>Dies i treballadors</h2>'+
         (!activeWorkers().length ? '<p class="meta">Afegeix persones al menú Equip per començar.</p>' : '')+
@@ -848,18 +861,22 @@ async function mountApp(request = localRequest, initial) {
   content.addEventListener('change', event => {
     const field = event.target;
     const {open, add} = field.dataset;
-    if (field.id === 'period-date') {
+    if (field.id === 'period-start' || field.id === 'period-date') {
+      const changingStart = field.id === 'period-start';
       const chosen = field.value;
-      if (!validDay(chosen) || weekday(chosen) !== 0 || chosen < firstSunday() ||
-          (latest() && (+dayOf(chosen) - +dayOf(latest().date)) / dayMs > 366)) {
-        field.value = date;
+      const nextStart = changingStart ? chosen : start;
+      const nextEnd = changingStart ? (chosen > date ? chosen : date) : chosen;
+      if (!validPeriodRange(nextStart,nextEnd,latest()?.date)) {
+        field.value = changingStart ? start : date;
         status.classList.add('error');
-        status.textContent = 'Tria un diumenge vàlid posterior a l’últim repartiment.';
+        status.textContent = 'Tria un període de fins a 366 dies, posterior a l’últim repartiment. La data final ha de ser igual o posterior a la inicial.';
         return;
       }
-      const existing = new Map(days.map(day => [day.date, day]));
-      date = chosen;
-      days = periodDays(date, latest(), data.workers).map(day => existing.get(day.date) ?? day);
+      const existing = new Map(days.map(day => [day.date,day]));
+      start = nextStart;
+      date = nextEnd;
+      days = periodDays(date,latest(),data.workers,start).map(day => existing.get(day.date) ?? day);
+      status.classList.remove('error');
       status.textContent = '';
     } else if (open !== undefined) {
       days[open].open = field.checked;
@@ -903,7 +920,7 @@ async function mountApp(request = localRequest, initial) {
     } else if (button.id === 'close-period') {
       const cents = parseCents(amount);
       if (!confirm('Tancar el repartiment de '+formatMoney(cents)+'?')) return;
-      void save({action:'close', date, cents, days:days.map(day => day.open ? day : {...day, entries:[]}), previousDate:latest()?.date ?? null}, () => {
+      void save({action:'close', start, date, cents, days:days.map(day => day.open ? day : {...day, entries:[]}), previousDate:latest()?.date ?? null}, () => {
         resetPeriod();
         tab = 'history';
       }, 'S’ha tancat el repartiment.');
