@@ -139,7 +139,7 @@ input,select,textarea,button,.button{max-width:100%;min-width:0}
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><h1>NexaTips</h1><div class="meta version">Versió 1.7.2<span id="sync-state" role="status"></span></div></div>
+  <div class="brand"><h1>NexaTips</h1><div class="meta version">Versió 1.7.3<span id="sync-state" role="status"></span></div></div>
   <div class="top-actions">
     <div class="menu-anchor">
       <button id="menu-toggle" type="button" aria-label="Menú" aria-expanded="false" aria-controls="menu-panel" hidden><span aria-hidden="true">☰</span><span class="top-action-label" aria-hidden="true">Menú</span></button>
@@ -510,10 +510,15 @@ async function localRequest(body) {
 function mountTipsViewer(request, initial) {
   const content = get('content');
   const status = get('status');
+  let state = initial;
+  let busy = false;
   function render(current) {
     content.innerHTML = '<section class="card"><h2>Repartiment actual</h2>'+
       (current ? '<p>'+fullDate.format(dayOf(current.date))+'</p>'+
-        (current.cents !== null ? '<p>Pot de propines <strong>'+formatMoney(current.cents)+'</strong></p>' : '')+
+        '<form id="viewer-pot"><div class="grid"><label>Pot de propines (€)'+
+        '<input name="amount" type="text" inputmode="decimal" maxlength="32" placeholder="0,00" required value="'+
+        (current.cents === null ? '' : (current.cents/100).toFixed(2).replace('.',','))+'"></label></div>'+
+        '<button class="primary">Desa el pot</button></form>'+
         (current.payouts.length ? '<ul class="payout-list">'+current.payouts.slice().sort((a,b) => a.name.localeCompare(b.name,'ca')).map(row =>
           '<li><span>'+escapeHtml(row.name)+'</span><span>'+formatPoints(row.units)+'</span><strong>'+formatMoney(row.cents)+'</strong></li>').join('')+'</ul>'
           : '<p class="meta">Els imports encara no estan disponibles.</p>')+
@@ -523,24 +528,55 @@ function mountTipsViewer(request, initial) {
       '<button id="refresh-current" type="button">Actualitza</button></section>';
   }
   async function refresh() {
-    const button = get('refresh-current');
-    if (button.disabled) return;
-    button.disabled = true;
+    if (busy) return;
+    busy = true;
     try {
-      const state = await request();
+      state = await request();
       render(state.current);
       status.textContent = '';
     } catch (error) {
       render(null);
       status.textContent = error.message;
+    } finally {
+      busy = false;
     }
   }
+  content.addEventListener('submit',async event => {
+    if (event.target.id !== 'viewer-pot') return;
+    event.preventDefault();
+    if (busy) return;
+    const form = event.target;
+    const amount = form.elements.amount.value;
+    if (parseCents(amount) === null) {
+      status.textContent = 'Introdueix un import vàlid.';
+      form.elements.amount.focus();
+      return;
+    }
+    busy = true;
+    const button = form.querySelector('button[type=submit],button');
+    button.disabled = true;
+    try {
+      await request({action:'viewerPot',amount,date:state.current.date,revision:state.revision});
+      status.textContent = 'Pot desat.';
+      state = await request();
+      render(state.current);
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      busy = false;
+      button.disabled = false;
+    }
+  });
   content.addEventListener('click', event => {
     if (event.target.id === 'refresh-current') void refresh();
   });
-  window.addEventListener('focus', () => { void refresh(); });
+  window.addEventListener('focus', () => {
+    if (!content.querySelector('form:focus-within')) void refresh();
+  });
   render(initial.current);
 }
+
+
 
 async function mountApp(request = localRequest, initial) {
   const content = get('content');
